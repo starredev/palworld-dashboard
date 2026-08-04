@@ -6,6 +6,7 @@ import { registerAuth } from './plugins/auth'
 import { registerPalworld } from './plugins/palworld'
 import { registerRealtime } from './plugins/realtime'
 import { healthRoutes } from './routes/health'
+import { configRoutes } from './routes/config'
 import { authRoutes } from './routes/auth'
 import { serverRoutes } from './routes/server'
 import { playerRoutes } from './routes/players'
@@ -40,6 +41,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   // All HTTP endpoints live under /api so a single reverse proxy can serve the
   // dashboard and forward /api to this service (same-origin, no browser CORS).
   await app.register(healthRoutes, { prefix: '/api' })
+  await app.register(configRoutes, { prefix: '/api' })
   await app.register(authRoutes, { prefix: '/api' })
   await app.register(serverRoutes, { prefix: '/api' })
   await app.register(playerRoutes, { prefix: '/api' })

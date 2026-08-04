@@ -34,6 +34,10 @@ const envSchema = z.object({
   PALWORLD_RCON_HOST: emptyToUndefined(z.string().optional()),
   PALWORLD_RCON_PORT: z.coerce.number().int().positive().default(25575),
   PALWORLD_RCON_PASSWORD: emptyToUndefined(z.string().optional()),
+
+  // ---- Dashboard runtime config (served to the browser via /api/config) ----
+  // Absolute URL of the live-map to embed. Empty => dashboard falls back to :3001.
+  LIVEMAP_URL: emptyToUndefined(z.string().url().optional()),
 })
 
 export type Env = z.infer<typeof envSchema>

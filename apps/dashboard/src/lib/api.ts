@@ -1,10 +1,12 @@
 import {
+  appConfigSchema,
   healthResponseSchema,
   palServerInfoSchema,
   palServerMetricsSchema,
   palStatusSchema,
   playersResponseSchema,
   sessionResponseSchema,
+  type AppConfig,
   type HealthResponse,
   type PalServerInfo,
   type PalServerMetrics,
@@ -21,6 +23,10 @@ import { apiFetch } from './http'
 export const api = {
   getHealth(): Promise<HealthResponse> {
     return apiFetch('/health', { schema: healthResponseSchema })
+  },
+
+  getConfig(): Promise<AppConfig> {
+    return apiFetch('/config', { schema: appConfigSchema })
   },
 
   login(password: string): Promise<SessionResponse> {
