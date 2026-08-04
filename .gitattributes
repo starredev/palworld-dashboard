@@ -1,0 +1,11 @@
+# Normalize line endings to LF in the repo (important for Docker/nginx/shell).
+* text=auto eol=lf
+
+# Binary types Git should not touch.
+*.png binary
+*.jpg binary
+*.ico binary
+*.woff2 binary
+
+# Lockfiles: keep as-is, don't diff noisily.
+pnpm-lock.yaml -diff

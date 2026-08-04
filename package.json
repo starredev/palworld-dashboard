@@ -1,0 +1,33 @@
+{
+  "name": "tsuki-panel",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@10.28.1",
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "scripts": {
+    "dev": "pnpm --parallel --stream -r --filter \"./apps/*\" dev",
+    "dev:api": "pnpm --filter @tsuki/api dev",
+    "dev:dashboard": "pnpm --filter @tsuki/dashboard dev",
+    "build": "pnpm -r build",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "pnpm -r typecheck",
+    "test": "pnpm -r test"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.18.0",
+    "@vue/eslint-config-prettier": "^10.2.0",
+    "@vue/eslint-config-typescript": "^14.5.0",
+    "eslint": "^9.18.0",
+    "eslint-plugin-vue": "^10.0.0",
+    "prettier": "^3.4.2",
+    "typescript": "^5.7.3",
+    "typescript-eslint": "^8.21.0",
+    "vue-eslint-parser": "^10.0.0"
+  }
+}
