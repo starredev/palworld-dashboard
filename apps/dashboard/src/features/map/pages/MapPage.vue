@@ -2,11 +2,15 @@
 import { computed, reactive } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
 import { ExternalLink, Map as MapIcon } from 'lucide-vue-next'
-import type { MapPointKind } from '@tsuki/types'
+import type { MapPoint, MapPointKind } from '@tsuki/types'
 import { Button, Card, Skeleton, cn } from '@tsuki/ui'
 import { api } from '@/lib/api'
 import PagePlaceholder from '@/components/common/PagePlaceholder.vue'
 import CoordinateMap from '../components/CoordinateMap.vue'
+import poiData from '../pois.json'
+
+// Static points of interest (tower bosses, field alphas) — fixed world locations.
+const pois = poiData as MapPoint[]
 
 const config = useQuery({ queryKey: ['config'], queryFn: () => api.getConfig() })
 const map = useQuery({
@@ -15,7 +19,7 @@ const map = useQuery({
   refetchInterval: 20_000,
 })
 
-const points = computed(() => map.data.value?.points ?? [])
+const points = computed(() => [...(map.data.value?.points ?? []), ...pois])
 const unavailable = computed(() => map.data.value && !map.data.value.available)
 
 const liveMapUrl = computed(() => {
@@ -32,6 +36,8 @@ const LAYERS: { kind: MapPointKind; label: string; color: string }[] = [
   { kind: 'pal', label: 'Pals', color: '#fbbf24' },
   { kind: 'wild', label: 'Wild', color: '#a3a3a3' },
   { kind: 'npc', label: 'NPCs', color: '#f87171' },
+  { kind: 'boss', label: 'Bosses', color: '#c084fc' },
+  { kind: 'alpha', label: 'Alphas', color: '#fb923c' },
 ]
 
 const visible = reactive<Record<MapPointKind, boolean>>({
@@ -40,6 +46,8 @@ const visible = reactive<Record<MapPointKind, boolean>>({
   pal: true,
   wild: true,
   npc: true,
+  boss: true,
+  alpha: false,
 })
 
 function count(kind: MapPointKind): number {

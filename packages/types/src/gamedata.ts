@@ -45,7 +45,7 @@ export const palsResponseSchema = z.object({
 export type PalsResponse = z.infer<typeof palsResponseSchema>
 
 /** A positioned entity for the built-in coordinate map. */
-export const mapPointKindSchema = z.enum(['player', 'base', 'pal', 'wild', 'npc'])
+export const mapPointKindSchema = z.enum(['player', 'base', 'pal', 'wild', 'npc', 'boss', 'alpha'])
 export type MapPointKind = z.infer<typeof mapPointKindSchema>
 
 export const mapPointSchema = z.object({

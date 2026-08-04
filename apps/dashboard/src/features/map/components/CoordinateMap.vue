@@ -21,6 +21,8 @@ const STYLE: Record<MapPointKind, { color: string; size: number; op: number }> =
   pal: { color: '#fbbf24', size: 11, op: 0.95 },
   wild: { color: '#a3a3a3', size: 10, op: 0.6 },
   npc: { color: '#f87171', size: 10, op: 0.6 },
+  boss: { color: '#c084fc', size: 14, op: 0.95 },
+  alpha: { color: '#fb923c', size: 10, op: 0.85 },
 }
 
 const shown = computed(() => props.points.filter((p) => props.visible[p.kind]))
