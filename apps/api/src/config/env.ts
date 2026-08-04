@@ -40,6 +40,9 @@ const envSchema = z.object({
   LIVEMAP_URL: emptyToUndefined(z.string().url().optional()),
   // Optional full Palworld (Palpagos) map image for the built-in map background.
   MAP_IMAGE_URL: emptyToUndefined(z.string().url().optional()),
+  // World-coordinate bounds of that image as "xTopLeft,yTopLeft,xBottomRight,yBottomRight".
+  // Default = the palworld-live-map palpagos.jpg bounds. Tweak to calibrate.
+  MAP_BOUNDS: z.string().default('349400,724400,-1099400,-724400'),
 
   // ---- Live PalWorldSettings.ini editing (optional) ----
   // Path INSIDE the api container to the server's ini. Mount the Palworld data

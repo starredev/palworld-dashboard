@@ -6,14 +6,12 @@ const props = defineProps<{
   points: MapPoint[]
   visible: Record<MapPointKind, boolean>
   imageUrl?: string | null
+  /** World bounds of the image: [xTopLeft, yTopLeft, xBottomRight, yBottomRight]. */
+  bounds?: [number, number, number, number]
 }>()
 
 const SIZE = 1000
 const PAD = 48
-
-// Palworld (.sav) world-coordinate bounds — square, so a north-up map image aligns.
-const WORLD = { minX: -582888, maxX: 335112, minY: -301000, maxY: 617000 }
-const SPAN = 918000
 
 const STYLE: Record<MapPointKind, { color: string; r: number }> = {
   player: { color: '#34d399', r: 9 },
@@ -41,13 +39,13 @@ const autoBounds = computed(() => {
 })
 
 const projected = computed(() => {
-  // With a map image: fixed world bounds so markers align with the image.
-  if (props.imageUrl) {
-    const scale = SIZE / SPAN
+  // With a map image: project onto the image's world bounds so markers align.
+  if (props.imageUrl && props.bounds) {
+    const [xTL, yTL, xBR, yBR] = props.bounds
     return shown.value.map((p) => ({
       point: p,
-      cx: (p.x - WORLD.minX) * scale,
-      cy: SIZE - (p.y - WORLD.minY) * scale,
+      cx: ((p.x - xTL) / (xBR - xTL)) * SIZE,
+      cy: ((p.y - yTL) / (yBR - yTL)) * SIZE,
       ...STYLE[p.kind],
     }))
   }
@@ -81,7 +79,7 @@ function tooltip(p: MapPoint): string {
     class="relative aspect-square w-full overflow-hidden rounded-2xl border border-border bg-background/60"
   >
     <svg :viewBox="`0 0 ${SIZE} ${SIZE}`" class="h-full w-full">
-      <image v-if="imageUrl" :href="imageUrl" x="0" y="0" :width="SIZE" :height="SIZE" />
+      <image v-if="imageUrl && bounds" :href="imageUrl" x="0" y="0" :width="SIZE" :height="SIZE" />
       <template v-else>
         <defs>
           <pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse">

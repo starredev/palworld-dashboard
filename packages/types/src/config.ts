@@ -6,6 +6,8 @@ export const appConfigSchema = z.object({
   liveMapUrl: z.string().nullable(),
   /** Optional Palworld map image URL for the built-in coordinate map background. */
   mapImageUrl: z.string().nullable(),
+  /** World bounds of that image: [xTopLeft, yTopLeft, xBottomRight, yBottomRight]. */
+  mapBounds: z.tuple([z.number(), z.number(), z.number(), z.number()]),
 })
 
 export type AppConfig = z.infer<typeof appConfigSchema>
