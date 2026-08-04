@@ -5,6 +5,7 @@ import { loadEnv } from './config/env'
 import { registerAuth } from './plugins/auth'
 import { registerPalworld } from './plugins/palworld'
 import { registerRealtime } from './plugins/realtime'
+import { registerBackupScheduler } from './plugins/backup-scheduler'
 import { healthRoutes } from './routes/health'
 import { configRoutes } from './routes/config'
 import { authRoutes } from './routes/auth'
@@ -43,6 +44,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await registerAuth(app)
   await registerPalworld(app)
   await registerRealtime(app)
+  await registerBackupScheduler(app)
 
   // All HTTP endpoints live under /api so a single reverse proxy can serve the
   // dashboard and forward /api to this service (same-origin, no browser CORS).

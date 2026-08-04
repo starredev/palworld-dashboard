@@ -12,6 +12,9 @@ services:
       AUTH_PASSWORD: ${AUTH_PASSWORD:?set AUTH_PASSWORD in your .env}
       JWT_SECRET: ${JWT_SECRET:?set a strong JWT_SECRET (min 16 chars) in your .env}
       SESSION_TTL: ${SESSION_TTL:-7d}
+      # Auto-backup every N hours (0 = off), keeping the newest N.
+      BACKUP_SCHEDULE_HOURS: ${BACKUP_SCHEDULE_HOURS:-0}
+      BACKUP_RETENTION: ${BACKUP_RETENTION:-7}
       # The reverse proxy makes everything same-origin, so browser CORS is unused.
       # Mark cookies Secure only when serving over HTTPS (see COOKIE_SECURE below).
       COOKIE_SECURE: ${COOKIE_SECURE:-false}

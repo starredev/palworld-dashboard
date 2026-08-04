@@ -55,6 +55,21 @@ export function deleteBackup(name: string): void {
   if (existsSync(path)) rmSync(path)
 }
 
+/** Names of prefixed backups beyond the newest `keep` (entries sorted newest-first). */
+export function backupsToPrune(entries: BackupEntry[], prefix: string, keep: number): string[] {
+  return entries
+    .filter((e) => e.name.startsWith(`${prefix}-`))
+    .slice(keep)
+    .map((e) => e.name)
+}
+
+/** Create an auto-backup and prune old ones beyond the retention count. */
+export function createAutoBackup(retention: number): BackupEntry {
+  const entry = createBackup('auto')
+  for (const name of backupsToPrune(listBackups(), 'auto', retention)) deleteBackup(name)
+  return entry
+}
+
 /** Restore a backup over the live saves, taking a safety backup first. */
 export function restoreBackup(name: string): void {
   const path = backupPath(name)

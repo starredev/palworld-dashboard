@@ -2,6 +2,7 @@ import { createReadStream, existsSync } from 'node:fs'
 import type { FastifyInstance } from 'fastify'
 import type { BackupsResponse } from '@tsuki/types'
 import { authenticate } from '../plugins/auth'
+import { loadEnv } from '../config/env'
 import {
   backupPath,
   createBackup,
@@ -13,7 +14,12 @@ import {
 
 export async function backupRoutes(app: FastifyInstance): Promise<void> {
   app.get('/backups', { preHandler: authenticate }, async (): Promise<BackupsResponse> => {
-    return { available: isBackupAvailable(), backups: listBackups() }
+    const env = loadEnv()
+    const schedule =
+      env.BACKUP_SCHEDULE_HOURS > 0
+        ? { hours: env.BACKUP_SCHEDULE_HOURS, retention: env.BACKUP_RETENTION }
+        : null
+    return { available: isBackupAvailable(), backups: listBackups(), schedule }
   })
 
   app.post('/backups', { preHandler: authenticate }, async (_req, reply) => {

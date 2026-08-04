@@ -21,6 +21,7 @@ const { query, create, restore, remove } = useBackups()
 const available = computed(() => query.data.value?.available === true)
 const backups = computed(() => query.data.value?.backups ?? [])
 const unavailable = computed(() => query.data.value && !query.data.value.available)
+const schedule = computed(() => query.data.value?.schedule ?? null)
 
 const restoreTarget = ref<BackupEntry | null>(null)
 const deleteTarget = ref<BackupEntry | null>(null)
@@ -45,6 +46,9 @@ function confirmDelete(): void {
         <h2 class="text-xl font-semibold tracking-tight">Backups</h2>
         <p class="text-sm text-muted-foreground">
           Snapshot, download and restore your world saves.
+          <span v-if="schedule" class="text-foreground">
+            Auto every {{ schedule.hours }}h, keeping {{ schedule.retention }}.
+          </span>
         </p>
       </div>
       <Button v-if="available" :disabled="create.isPending.value" @click="create.mutate()">

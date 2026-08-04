@@ -55,6 +55,9 @@ const envSchema = z.object({
   // Save games dir (inside the mounted data volume) and where zips are stored.
   PALWORLD_SAVE_DIR: z.string().default('/palworld-data/Pal/Saved/SaveGames'),
   BACKUP_DIR: z.string().default('/backups'),
+  // Auto-backup every N hours (0 = disabled), keeping the newest N auto-backups.
+  BACKUP_SCHEDULE_HOURS: z.coerce.number().nonnegative().default(0),
+  BACKUP_RETENTION: z.coerce.number().int().positive().default(7),
 
   // ---- Logs viewer (optional) ----
   PALWORLD_LOG_PATH: z.string().default('/palworld-data/Pal/Saved/Logs/Pal.log'),
