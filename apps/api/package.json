@@ -16,6 +16,7 @@
     "@fastify/cors": "^11.0.0",
     "@fastify/jwt": "^9.0.4",
     "@fastify/websocket": "^11.0.2",
+    "adm-zip": "^0.5.16",
     "@tsuki/sdk": "workspace:*",
     "@tsuki/shared": "workspace:*",
     "@tsuki/types": "workspace:*",
@@ -24,6 +25,7 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@types/adm-zip": "^0.5.7",
     "@types/node": "^22.10.7",
     "pino-pretty": "^13.0.0",
     "tsup": "^8.3.5",

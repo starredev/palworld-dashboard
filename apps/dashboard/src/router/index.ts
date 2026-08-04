@@ -38,6 +38,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: 'Server config' },
       },
       {
+        path: 'backups',
+        name: 'backups',
+        component: () => import('@/features/backups/pages/BackupsPage.vue'),
+        meta: { title: 'Backups' },
+      },
+      {
         path: ':pathMatch(.*)*',
         name: 'not-found',
         component: () => import('@/features/misc/pages/NotFoundPage.vue'),

@@ -45,6 +45,11 @@ const envSchema = z.object({
   PALWORLD_INI_PATH: z
     .string()
     .default('/palworld-data/Pal/Saved/Config/LinuxServer/PalWorldSettings.ini'),
+
+  // ---- Backups (optional) ----
+  // Save games dir (inside the mounted data volume) and where zips are stored.
+  PALWORLD_SAVE_DIR: z.string().default('/palworld-data/Pal/Saved/SaveGames'),
+  BACKUP_DIR: z.string().default('/backups'),
 })
 
 export type Env = z.infer<typeof envSchema>

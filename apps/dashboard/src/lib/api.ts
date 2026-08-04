@@ -1,5 +1,7 @@
 import {
   appConfigSchema,
+  backupEntrySchema,
+  backupsResponseSchema,
   commandResultSchema,
   gameConfigSchema,
   gameConfigWriteResultSchema,
@@ -10,6 +12,8 @@ import {
   playersResponseSchema,
   sessionResponseSchema,
   type AppConfig,
+  type BackupEntry,
+  type BackupsResponse,
   type CommandResult,
   type GameConfig,
   type GameConfigWriteResult,
@@ -20,7 +24,7 @@ import {
   type PlayersResponse,
   type SessionResponse,
 } from '@tsuki/types'
-import { apiFetch } from './http'
+import { apiFetch, apiUrl } from './http'
 
 /**
  * Thin, typed facade over the backend HTTP endpoints. The frontend only ever
@@ -111,5 +115,25 @@ export const api = {
       method: 'POST',
       schema: commandResultSchema,
     })
+  },
+
+  getBackups(): Promise<BackupsResponse> {
+    return apiFetch('/backups', { schema: backupsResponseSchema })
+  },
+
+  createBackup(): Promise<BackupEntry> {
+    return apiFetch('/backups', { method: 'POST', schema: backupEntrySchema })
+  },
+
+  restoreBackup(name: string): Promise<unknown> {
+    return apiFetch(`/backups/${encodeURIComponent(name)}/restore`, { method: 'POST' })
+  },
+
+  deleteBackup(name: string): Promise<unknown> {
+    return apiFetch(`/backups/${encodeURIComponent(name)}`, { method: 'DELETE' })
+  },
+
+  backupDownloadUrl(name: string): string {
+    return apiUrl(`/backups/${encodeURIComponent(name)}/download`)
   },
 }

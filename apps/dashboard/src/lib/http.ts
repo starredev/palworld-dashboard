@@ -4,6 +4,11 @@ import type { ZodType } from 'zod'
 // In dev, Vite proxies `/api` (see vite.config.ts); in prod, nginx does.
 const BASE_URL = (import.meta.env.VITE_API_URL ?? '/api').replace(/\/$/, '')
 
+/** Absolute URL for an API path — for direct navigation like file downloads. */
+export function apiUrl(path: string): string {
+  return `${BASE_URL}${path}`
+}
+
 export class ApiError extends Error {
   constructor(
     public readonly status: number,

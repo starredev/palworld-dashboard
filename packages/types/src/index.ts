@@ -1,4 +1,5 @@
 export * from './auth'
+export * from './backups'
 export * from './commands'
 export * from './config'
 export * from './health'

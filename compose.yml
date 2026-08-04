@@ -24,6 +24,9 @@ services:
       PALWORLD_RCON_PASSWORD: ${PALWORLD_RCON_PASSWORD:-}
       # Absolute URL of the live-map, served to the browser at runtime.
       LIVEMAP_URL: ${LIVEMAP_URL:-}
+    volumes:
+      # Persist save backups created from the Backups page.
+      - tsuki-backups:/backups
     expose:
       - '4000'
     restart: unless-stopped
@@ -54,3 +57,6 @@ services:
       api:
         condition: service_healthy
     restart: unless-stopped
+
+volumes:
+  tsuki-backups:
