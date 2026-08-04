@@ -6,6 +6,6 @@ import { loadEnv } from '../config/env'
 export async function configRoutes(app: FastifyInstance): Promise<void> {
   app.get('/config', async (): Promise<AppConfig> => {
     const env = loadEnv()
-    return { liveMapUrl: env.LIVEMAP_URL ?? null }
+    return { liveMapUrl: env.LIVEMAP_URL ?? null, mapImageUrl: env.MAP_IMAGE_URL ?? null }
   })
 }

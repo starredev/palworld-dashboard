@@ -23,6 +23,7 @@ const liveMapUrl = computed(() => {
   const { protocol, hostname } = window.location
   return `${protocol}//${hostname}:3001`
 })
+const mapImageUrl = computed(() => config.data.value?.mapImageUrl ?? null)
 
 const LAYERS: { kind: MapPointKind; label: string; color: string }[] = [
   { kind: 'player', label: 'Players', color: '#34d399' },
@@ -102,7 +103,7 @@ function count(kind: MapPointKind): number {
       </div>
 
       <Card class="p-3 sm:p-4">
-        <CoordinateMap :points="points" :visible="visible" />
+        <CoordinateMap :points="points" :visible="visible" :image-url="mapImageUrl" />
       </Card>
     </template>
   </section>
