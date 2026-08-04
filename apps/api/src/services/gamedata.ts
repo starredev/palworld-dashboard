@@ -1,4 +1,4 @@
-import type { Guild, GuildMember, Pal } from '@tsuki/types'
+import type { Guild, GuildMember, MapPoint, MapPointKind, Pal } from '@tsuki/types'
 import { loadEnv } from '../config/env'
 
 export interface RawPlayer {
@@ -11,6 +11,8 @@ export interface RawPlayer {
   lastSeenAt?: string
   captureTotal?: number
   paldeckUnlocked?: number
+  x?: number
+  y?: number
 }
 export interface RawObject {
   id: string
@@ -20,6 +22,15 @@ export interface RawObject {
   baseId?: string
   guildKey?: string
   level?: number
+  x?: number
+  y?: number
+}
+
+const OBJECT_KIND: Record<string, MapPointKind> = {
+  bases: 'base',
+  workers: 'pal',
+  'wild-pals': 'wild',
+  npcs: 'npc',
 }
 
 export function isGameDataConfigured(): boolean {
@@ -39,14 +50,66 @@ async function fetchJson<T>(path: string): Promise<T> {
   }
 }
 
-/** Fetch the live-map endpoints and derive guilds + pals. */
-export async function getGameData(): Promise<{ guilds: Guild[]; pals: Pal[] }> {
+async function fetchRaw(): Promise<{ players: RawPlayer[]; objects: RawObject[] }> {
   const env = loadEnv()
   const [state, objectsRes] = await Promise.all([
     fetchJson<{ players?: RawPlayer[] }>(env.GAMEDATA_STATE_PATH),
     fetchJson<{ objects?: RawObject[] }>(env.GAMEDATA_OBJECTS_PATH),
   ])
-  return deriveGameData(state.players ?? [], objectsRes.objects ?? [])
+  return { players: state.players ?? [], objects: objectsRes.objects ?? [] }
+}
+
+/** Fetch the live-map endpoints and derive guilds + pals. */
+export async function getGameData(): Promise<{ guilds: Guild[]; pals: Pal[] }> {
+  const { players, objects } = await fetchRaw()
+  return deriveGameData(players, objects)
+}
+
+/** Fetch positioned entities for the built-in coordinate map. */
+export async function getMapPoints(): Promise<MapPoint[]> {
+  const { players, objects } = await fetchRaw()
+  return buildMapPoints(players, objects)
+}
+
+export function buildMapPoints(players: RawPlayer[], objects: RawObject[]): MapPoint[] {
+  const guildNameByKey = new Map<string, string>()
+  for (const p of players)
+    if (p.guildKey && p.guildName) guildNameByKey.set(p.guildKey, p.guildName)
+  for (const o of objects)
+    if (o.kind === 'bases' && o.guildKey && o.name) guildNameByKey.set(o.guildKey, o.name)
+
+  const points: MapPoint[] = []
+  for (const p of players) {
+    if (p.x == null || p.y == null) continue
+    points.push({
+      id: p.id,
+      kind: 'player',
+      name: p.name,
+      detail: null,
+      level: p.level ?? null,
+      guildName: p.guildName ?? null,
+      online: Boolean(p.online),
+      x: p.x,
+      y: p.y,
+    })
+  }
+  for (const o of objects) {
+    const kind = OBJECT_KIND[o.kind]
+    if (!kind || o.x == null || o.y == null) continue
+    points.push({
+      id: o.id,
+      kind,
+      // Base `name` is the guild name (redundant with guildName) — label it plainly.
+      name: kind === 'base' ? 'Base' : (o.name ?? kind),
+      detail: o.detail ?? null,
+      level: o.level ?? null,
+      guildName: o.guildKey ? (guildNameByKey.get(o.guildKey) ?? null) : null,
+      online: null,
+      x: o.x,
+      y: o.y,
+    })
+  }
+  return points
 }
 
 /** Pure transform of raw live-map data into guilds + pals (unit-testable). */

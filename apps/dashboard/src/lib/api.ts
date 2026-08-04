@@ -5,6 +5,7 @@ import {
   commandResultSchema,
   guildsResponseSchema,
   palsResponseSchema,
+  mapResponseSchema,
   gameConfigSchema,
   gameConfigWriteResultSchema,
   healthResponseSchema,
@@ -21,6 +22,7 @@ import {
   type GameConfigWriteResult,
   type GuildsResponse,
   type HealthResponse,
+  type MapResponse,
   type PalsResponse,
   type PalServerInfo,
   type PalServerMetrics,
@@ -154,5 +156,9 @@ export const api = {
 
   getPals(): Promise<PalsResponse> {
     return apiFetch('/pals', { schema: palsResponseSchema })
+  },
+
+  getMapPoints(): Promise<MapResponse> {
+    return apiFetch('/map', { schema: mapResponseSchema })
   },
 }

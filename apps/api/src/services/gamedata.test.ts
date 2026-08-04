@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { deriveGameData, type RawObject, type RawPlayer } from './gamedata'
+import { buildMapPoints, deriveGameData, type RawObject, type RawPlayer } from './gamedata'
 
 const players: RawPlayer[] = [
   {
@@ -48,5 +48,44 @@ describe('deriveGameData', () => {
   it('excludes npcs and wild pals from the pal list', () => {
     const { pals } = deriveGameData(players, objects)
     expect(pals.every((p) => p.name !== 'Syndicate Thug' && p.name !== 'Caprity')).toBe(true)
+  })
+})
+
+describe('buildMapPoints', () => {
+  it('maps object kinds and skips points without coordinates', () => {
+    const pts = buildMapPoints(
+      [
+        {
+          id: 'p1',
+          name: 'Invisiouz',
+          guildKey: 'g1',
+          guildName: 'Unnamed Guild',
+          online: true,
+          x: -364710,
+          y: 162587,
+        },
+      ],
+      [
+        { id: 'b1', kind: 'bases', name: 'Unnamed Guild', guildKey: 'g1', x: -353594, y: 270051 },
+        {
+          id: 'w1',
+          kind: 'workers',
+          name: 'Vixy',
+          detail: 'CuteFox',
+          guildKey: 'g1',
+          level: 12,
+          x: -385958,
+          y: 234797,
+        },
+        { id: 'wp1', kind: 'wild-pals', name: 'Caprity', x: -299645, y: 210803 },
+        { id: 'no', kind: 'workers', name: 'NoCoords', guildKey: 'g1' },
+      ],
+    )
+    expect(pts.map((p) => p.kind)).toEqual(['player', 'base', 'pal', 'wild'])
+    expect(pts.find((p) => p.kind === 'pal')).toMatchObject({
+      name: 'Vixy',
+      guildName: 'Unnamed Guild',
+    })
+    expect(pts.find((p) => p.kind === 'player')?.online).toBe(true)
   })
 })

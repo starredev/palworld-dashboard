@@ -43,3 +43,26 @@ export const palsResponseSchema = z.object({
   pals: z.array(palSchema),
 })
 export type PalsResponse = z.infer<typeof palsResponseSchema>
+
+/** A positioned entity for the built-in coordinate map. */
+export const mapPointKindSchema = z.enum(['player', 'base', 'pal', 'wild', 'npc'])
+export type MapPointKind = z.infer<typeof mapPointKindSchema>
+
+export const mapPointSchema = z.object({
+  id: z.string(),
+  kind: mapPointKindSchema,
+  name: z.string(),
+  detail: z.string().nullable(),
+  level: z.number().int().nonnegative().nullable(),
+  guildName: z.string().nullable(),
+  online: z.boolean().nullable(),
+  x: z.number(),
+  y: z.number(),
+})
+export type MapPoint = z.infer<typeof mapPointSchema>
+
+export const mapResponseSchema = z.object({
+  available: z.boolean(),
+  points: z.array(mapPointSchema),
+})
+export type MapResponse = z.infer<typeof mapResponseSchema>

@@ -1,60 +1,109 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, reactive } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
 import { ExternalLink, Map as MapIcon } from 'lucide-vue-next'
-import { Button } from '@tsuki/ui'
+import type { MapPointKind } from '@tsuki/types'
+import { Button, Card, Skeleton, cn } from '@tsuki/ui'
 import { api } from '@/lib/api'
+import PagePlaceholder from '@/components/common/PagePlaceholder.vue'
+import CoordinateMap from '../components/CoordinateMap.vue'
 
-/**
- * The live-map opens in a new tab — most map tools block iframe embedding, so a
- * launcher is more reliable than a broken embed. The URL comes from the API at
- * runtime (LIVEMAP_URL env), falling back to the same host on :3001.
- */
-const { data } = useQuery({ queryKey: ['config'], queryFn: () => api.getConfig() })
+const config = useQuery({ queryKey: ['config'], queryFn: () => api.getConfig() })
+const map = useQuery({
+  queryKey: ['map'],
+  queryFn: () => api.getMapPoints(),
+  refetchInterval: 20_000,
+})
+
+const points = computed(() => map.data.value?.points ?? [])
+const unavailable = computed(() => map.data.value && !map.data.value.available)
 
 const liveMapUrl = computed(() => {
-  if (data.value?.liveMapUrl) return data.value.liveMapUrl
+  if (config.data.value?.liveMapUrl) return config.data.value.liveMapUrl
   const { protocol, hostname } = window.location
   return `${protocol}//${hostname}:3001`
 })
 
-const host = computed(() => {
-  try {
-    return new URL(liveMapUrl.value).host
-  } catch {
-    return liveMapUrl.value
-  }
+const LAYERS: { kind: MapPointKind; label: string; color: string }[] = [
+  { kind: 'player', label: 'Players', color: '#34d399' },
+  { kind: 'base', label: 'Bases', color: '#38bdf8' },
+  { kind: 'pal', label: 'Pals', color: '#fbbf24' },
+  { kind: 'wild', label: 'Wild', color: '#a3a3a3' },
+  { kind: 'npc', label: 'NPCs', color: '#f87171' },
+]
+
+const visible = reactive<Record<MapPointKind, boolean>>({
+  player: true,
+  base: true,
+  pal: true,
+  wild: true,
+  npc: true,
 })
+
+function count(kind: MapPointKind): number {
+  return points.value.filter((p) => p.kind === kind).length
+}
 </script>
 
 <template>
-  <section class="space-y-6">
-    <header class="space-y-1">
-      <h2 class="text-xl font-semibold tracking-tight">Live map</h2>
-      <p class="text-sm text-muted-foreground">
-        Real-time player, guild and pal positions from your live-map service.
-      </p>
-    </header>
-
-    <div
-      class="flex min-h-[55vh] flex-col items-center justify-center gap-5 rounded-2xl border border-border bg-card p-8 text-center"
-    >
-      <span class="grid size-14 place-items-center rounded-2xl bg-primary text-primary-foreground">
-        <MapIcon class="size-7" />
-      </span>
-      <div class="space-y-1.5">
-        <h3 class="text-lg font-semibold tracking-tight">Open the live map</h3>
-        <p class="max-w-md text-sm text-muted-foreground">
-          It opens in a new tab and shows live players, guilds and pals across the world.
+  <section class="space-y-4">
+    <header class="flex flex-wrap items-end justify-between gap-3">
+      <div class="space-y-1">
+        <h2 class="text-xl font-semibold tracking-tight">Map</h2>
+        <p class="text-sm text-muted-foreground">
+          Live positions from your save data — refreshes each save (~1 min), not smooth movement.
         </p>
       </div>
       <a :href="liveMapUrl" target="_blank" rel="noopener noreferrer">
-        <Button size="lg">
-          <ExternalLink />
-          Open live map
-        </Button>
+        <Button variant="outline"><ExternalLink />Open full live map</Button>
       </a>
-      <p class="font-mono text-xs text-muted-foreground/70">{{ host }}</p>
+    </header>
+
+    <div v-if="map.isLoading.value" class="space-y-3">
+      <Skeleton class="aspect-square w-full" />
     </div>
+
+    <PagePlaceholder
+      v-else-if="unavailable"
+      :icon="MapIcon"
+      title="Map data unavailable"
+      description="Point the API at your live-map GameData endpoint (set GAMEDATA_URL) to plot positions here."
+    />
+    <PagePlaceholder
+      v-else-if="points.length === 0"
+      :icon="MapIcon"
+      title="Nothing to plot yet"
+      description="Player, base and Pal positions will appear here from your save data."
+    />
+
+    <template v-else>
+      <div class="flex flex-wrap gap-2">
+        <button
+          v-for="layer in LAYERS"
+          :key="layer.kind"
+          type="button"
+          :class="
+            cn(
+              'inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
+              visible[layer.kind]
+                ? 'border-border bg-card'
+                : 'border-border/50 text-muted-foreground/60',
+            )
+          "
+          @click="visible[layer.kind] = !visible[layer.kind]"
+        >
+          <span
+            class="size-2.5 rounded-full"
+            :style="{ backgroundColor: layer.color, opacity: visible[layer.kind] ? 1 : 0.4 }"
+          />
+          {{ layer.label }}
+          <span class="text-muted-foreground/70">{{ count(layer.kind) }}</span>
+        </button>
+      </div>
+
+      <Card class="p-3 sm:p-4">
+        <CoordinateMap :points="points" :visible="visible" />
+      </Card>
+    </template>
   </section>
 </template>
