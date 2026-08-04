@@ -5,6 +5,7 @@ import { formatUptime } from '@tsuki/shared'
 import { useServerOverview } from '@/composables/use-server'
 import StatCard from '../components/StatCard.vue'
 import ServerControls from '../components/ServerControls.vue'
+import ActivityFeed from '../components/ActivityFeed.vue'
 import PagePlaceholder from '@/components/common/PagePlaceholder.vue'
 
 const { status, metrics, info } = useServerOverview()
@@ -65,6 +66,9 @@ const inGameDay = computed(() => m.value?.days ?? undefined)
       />
     </div>
 
-    <ServerControls v-if="reachable" />
+    <div v-if="reachable" class="grid gap-4 lg:grid-cols-2">
+      <ServerControls />
+      <ActivityFeed />
+    </div>
   </section>
 </template>

@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { Users, PlugZap, ServerOff } from 'lucide-vue-next'
+import { Users, PlugZap, ServerOff, Search } from 'lucide-vue-next'
 import type { PalPlayer } from '@tsuki/types'
-import { Skeleton, ConfirmDialog } from '@tsuki/ui'
+import { Skeleton, ConfirmDialog, Input } from '@tsuki/ui'
 import { useServerStatus } from '@/composables/use-server'
 import { usePlayers } from '@/composables/use-players'
 import { useServerCommands } from '@/composables/use-commands'
 import PagePlaceholder from '@/components/common/PagePlaceholder.vue'
-import PlayerTable from '../components/PlayerTable.vue'
+import PlayerTable, { type SortKey } from '../components/PlayerTable.vue'
 
 const status = useServerStatus()
 const statusData = computed(() => status.data.value)
@@ -18,6 +18,40 @@ const offline = computed(() => statusData.value?.configured && !statusData.value
 const players = usePlayers(reachable)
 const list = computed(() => players.data.value?.players ?? [])
 const loading = computed(() => reachable.value && players.isLoading.value)
+
+const search = ref('')
+const sortKey = ref<SortKey>('name')
+const sortDir = ref<'asc' | 'desc'>('asc')
+
+function onSort(key: SortKey): void {
+  if (sortKey.value === key) sortDir.value = sortDir.value === 'asc' ? 'desc' : 'asc'
+  else {
+    sortKey.value = key
+    sortDir.value = 'asc'
+  }
+}
+
+function compare(a: PalPlayer, b: PalPlayer): number {
+  const key = sortKey.value
+  if (key === 'name') return a.name.localeCompare(b.name)
+  const av = a[key] ?? -1
+  const bv = b[key] ?? -1
+  return av - bv
+}
+
+const displayed = computed(() => {
+  const q = search.value.trim().toLowerCase()
+  const filtered = q
+    ? list.value.filter(
+        (p) =>
+          p.name.toLowerCase().includes(q) ||
+          (p.userId ?? '').toLowerCase().includes(q) ||
+          (p.playerId ?? '').toLowerCase().includes(q),
+      )
+    : list.value
+  const sorted = [...filtered].sort(compare)
+  return sortDir.value === 'desc' ? sorted.reverse() : sorted
+})
 
 const { kick, ban } = useServerCommands()
 const actingId = ref<string | null>(null)
@@ -44,12 +78,18 @@ function confirmBan(): void {
 
 <template>
   <section class="space-y-6">
-    <header class="flex items-end justify-between">
+    <header class="flex flex-wrap items-end justify-between gap-3">
       <div class="space-y-1">
         <h2 class="text-xl font-semibold tracking-tight">Players</h2>
         <p class="text-sm text-muted-foreground">
           {{ reachable ? `${list.length} online` : 'Online players on your server' }}
         </p>
+      </div>
+      <div v-if="reachable && list.length" class="relative">
+        <Search
+          class="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+        />
+        <Input v-model="search" placeholder="Search players…" class="w-56 pl-9" />
       </div>
     </header>
 
@@ -74,12 +114,21 @@ function confirmBan(): void {
       title="No players online"
       description="When players join your server, they'll appear here."
     />
+    <PagePlaceholder
+      v-else-if="displayed.length === 0"
+      :icon="Search"
+      title="No matches"
+      :description="`No players match '${search}'.`"
+    />
     <PlayerTable
       v-else
-      :players="list"
+      :players="displayed"
       :busy-id="actingId"
+      :sort-key="sortKey"
+      :sort-dir="sortDir"
       @kick="onKick"
       @ban="(p) => (banTarget = p)"
+      @sort="onSort"
     />
 
     <ConfirmDialog

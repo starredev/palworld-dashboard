@@ -1,6 +1,7 @@
 import { onScopeDispose, ref } from 'vue'
 import { useQueryClient } from '@tanstack/vue-query'
 import { realtimeMessageSchema } from '@tsuki/types'
+import { useEventsStore } from '@/stores/events'
 
 function wsUrl(): string {
   const base = import.meta.env.VITE_API_URL ?? '/api'
@@ -17,6 +18,7 @@ function wsUrl(): string {
  */
 export function useRealtime() {
   const queryClient = useQueryClient()
+  const events = useEventsStore()
   const connected = ref(false)
 
   let socket: WebSocket | null = null
@@ -33,6 +35,7 @@ export function useRealtime() {
       queryClient.setQueryData(['server', 'metrics'], message.data)
     else if (message.type === 'players')
       queryClient.setQueryData(['players'], { source: 'rest', players: message.data })
+    else if (message.type === 'event') events.add(message.data)
   }
 
   function connect(): void {

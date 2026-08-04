@@ -1,10 +1,23 @@
 <script setup lang="ts">
 import type { PalPlayer } from '@tsuki/types'
-import { UserX, Ban } from 'lucide-vue-next'
+import { UserX, Ban, ChevronUp, ChevronDown } from 'lucide-vue-next'
 import { Card, Button } from '@tsuki/ui'
 
-defineProps<{ players: PalPlayer[]; busyId?: string | null }>()
-defineEmits<{ kick: [player: PalPlayer]; ban: [player: PalPlayer] }>()
+export type SortKey = 'name' | 'level' | 'ping'
+
+defineProps<{
+  players: PalPlayer[]
+  busyId?: string | null
+  sortKey?: SortKey
+  sortDir?: 'asc' | 'desc'
+}>()
+defineEmits<{ kick: [player: PalPlayer]; ban: [player: PalPlayer]; sort: [key: SortKey] }>()
+
+const COLUMNS: { key: SortKey; label: string }[] = [
+  { key: 'name', label: 'Name' },
+  { key: 'level', label: 'Level' },
+  { key: 'ping', label: 'Ping' },
+]
 
 function dash(value: string | number | null | undefined): string {
   return value == null || value === '' ? '—' : String(value)
@@ -17,9 +30,16 @@ function dash(value: string | number | null | undefined): string {
       <table class="w-full text-sm">
         <thead>
           <tr class="border-b border-border text-left text-xs text-muted-foreground">
-            <th class="px-5 py-3 font-medium">Name</th>
-            <th class="px-5 py-3 font-medium">Level</th>
-            <th class="px-5 py-3 font-medium">Ping</th>
+            <th v-for="col in COLUMNS" :key="col.key" class="px-5 py-3 font-medium">
+              <button
+                class="flex items-center gap-1 hover:text-foreground"
+                @click="$emit('sort', col.key)"
+              >
+                {{ col.label }}
+                <ChevronUp v-if="sortKey === col.key && sortDir === 'asc'" class="size-3" />
+                <ChevronDown v-else-if="sortKey === col.key && sortDir === 'desc'" class="size-3" />
+              </button>
+            </th>
             <th class="px-5 py-3 font-medium">Player ID</th>
             <th class="px-5 py-3 text-right font-medium">Actions</th>
           </tr>
