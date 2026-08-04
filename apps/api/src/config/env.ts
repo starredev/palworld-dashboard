@@ -50,6 +50,11 @@ const envSchema = z.object({
   // Save games dir (inside the mounted data volume) and where zips are stored.
   PALWORLD_SAVE_DIR: z.string().default('/palworld-data/Pal/Saved/SaveGames'),
   BACKUP_DIR: z.string().default('/backups'),
+
+  // ---- Guilds & Pals via the live-map's GameData API (optional) ----
+  GAMEDATA_URL: emptyToUndefined(z.string().url().optional()),
+  GAMEDATA_STATE_PATH: z.string().default('/api/state'),
+  GAMEDATA_OBJECTS_PATH: z.string().default('/api/objects'),
 })
 
 export type Env = z.infer<typeof envSchema>

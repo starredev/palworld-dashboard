@@ -1,6 +1,8 @@
 import {
   LayoutDashboard,
   Users,
+  Shield,
+  PawPrint,
   Map,
   SlidersHorizontal,
   Archive,
@@ -17,6 +19,8 @@ export interface NavItem {
 export const NAV_ITEMS: NavItem[] = [
   { label: 'Overview', to: '/', icon: LayoutDashboard },
   { label: 'Players', to: '/players', icon: Users },
+  { label: 'Guilds', to: '/guilds', icon: Shield },
+  { label: 'Pals', to: '/pals', icon: PawPrint },
   { label: 'Map', to: '/map', icon: Map },
   { label: 'Config', to: '/config', icon: SlidersHorizontal },
   { label: 'Backups', to: '/backups', icon: Archive },

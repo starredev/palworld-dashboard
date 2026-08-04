@@ -24,6 +24,10 @@ services:
       PALWORLD_RCON_PASSWORD: ${PALWORLD_RCON_PASSWORD:-}
       # Absolute URL of the live-map, served to the browser at runtime.
       LIVEMAP_URL: ${LIVEMAP_URL:-}
+      # Guilds & Pals via the live-map's GameData API (internal URL + paths).
+      GAMEDATA_URL: ${GAMEDATA_URL:-}
+      GAMEDATA_STATE_PATH: ${GAMEDATA_STATE_PATH:-/api/state}
+      GAMEDATA_OBJECTS_PATH: ${GAMEDATA_OBJECTS_PATH:-/api/objects}
     volumes:
       # Persist save backups created from the Backups page.
       - tsuki-backups:/backups

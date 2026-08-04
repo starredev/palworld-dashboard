@@ -3,6 +3,8 @@ import {
   backupEntrySchema,
   backupsResponseSchema,
   commandResultSchema,
+  guildsResponseSchema,
+  palsResponseSchema,
   gameConfigSchema,
   gameConfigWriteResultSchema,
   healthResponseSchema,
@@ -17,7 +19,9 @@ import {
   type CommandResult,
   type GameConfig,
   type GameConfigWriteResult,
+  type GuildsResponse,
   type HealthResponse,
+  type PalsResponse,
   type PalServerInfo,
   type PalServerMetrics,
   type PalStatus,
@@ -142,5 +146,13 @@ export const api = {
 
   backupDownloadUrl(name: string): string {
     return apiUrl(`/backups/${encodeURIComponent(name)}/download`)
+  },
+
+  getGuilds(): Promise<GuildsResponse> {
+    return apiFetch('/guilds', { schema: guildsResponseSchema })
+  },
+
+  getPals(): Promise<PalsResponse> {
+    return apiFetch('/pals', { schema: palsResponseSchema })
   },
 }
