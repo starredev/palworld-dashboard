@@ -15,6 +15,13 @@ services:
       # The reverse proxy makes everything same-origin, so browser CORS is unused.
       # Mark cookies Secure only when serving over HTTPS (see COOKIE_SECURE below).
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      # Palworld connection (set whichever your server exposes; both optional).
+      PALWORLD_REST_URL: ${PALWORLD_REST_URL:-}
+      PALWORLD_REST_USERNAME: ${PALWORLD_REST_USERNAME:-admin}
+      PALWORLD_REST_PASSWORD: ${PALWORLD_REST_PASSWORD:-}
+      PALWORLD_RCON_HOST: ${PALWORLD_RCON_HOST:-}
+      PALWORLD_RCON_PORT: ${PALWORLD_RCON_PORT:-25575}
+      PALWORLD_RCON_PASSWORD: ${PALWORLD_RCON_PASSWORD:-}
     expose:
       - '4000'
     restart: unless-stopped

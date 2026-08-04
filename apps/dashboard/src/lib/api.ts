@@ -1,7 +1,15 @@
 import {
   healthResponseSchema,
+  palServerInfoSchema,
+  palServerMetricsSchema,
+  palStatusSchema,
+  playersResponseSchema,
   sessionResponseSchema,
   type HealthResponse,
+  type PalServerInfo,
+  type PalServerMetrics,
+  type PalStatus,
+  type PlayersResponse,
   type SessionResponse,
 } from '@tsuki/types'
 import { apiFetch } from './http'
@@ -29,5 +37,21 @@ export const api = {
 
   getSession(): Promise<SessionResponse> {
     return apiFetch('/auth/me', { schema: sessionResponseSchema })
+  },
+
+  getServerStatus(): Promise<PalStatus> {
+    return apiFetch('/server/status', { schema: palStatusSchema })
+  },
+
+  getServerInfo(): Promise<PalServerInfo> {
+    return apiFetch('/server/info', { schema: palServerInfoSchema })
+  },
+
+  getServerMetrics(): Promise<PalServerMetrics> {
+    return apiFetch('/server/metrics', { schema: palServerMetricsSchema })
+  },
+
+  getPlayers(): Promise<PlayersResponse> {
+    return apiFetch('/players', { schema: playersResponseSchema })
   },
 }

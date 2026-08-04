@@ -61,16 +61,29 @@ Open `http://<your-server-ip>/` and sign in.
 
 ### Required / useful env (root `.env`)
 
-| Variable | Required | Notes |
-| --- | --- | --- |
-| `AUTH_PASSWORD` | ✅ | Panel admin password |
-| `JWT_SECRET` | ✅ | Session-signing secret, min 16 chars — use a long random value |
-| `HTTP_PORT` | — | Public port nginx listens on (default `80`) |
-| `COOKIE_SECURE` | — | Set to `true` once you serve over HTTPS |
-| `SESSION_TTL` | — | Session lifetime (default `7d`) |
+| Variable        | Required | Notes                                                          |
+| --------------- | -------- | -------------------------------------------------------------- |
+| `AUTH_PASSWORD` | ✅       | Panel admin password                                           |
+| `JWT_SECRET`    | ✅       | Session-signing secret, min 16 chars — use a long random value |
+| `HTTP_PORT`     | —        | Public port nginx listens on (default `80`)                    |
+| `COOKIE_SECURE` | —        | Set to `true` once you serve over HTTPS                        |
+| `SESSION_TTL`   | —        | Session lifetime (default `7d`)                                |
 
 Compose **refuses to start** if `AUTH_PASSWORD` or `JWT_SECRET` is unset — that's
 intentional, so you never ship the insecure defaults.
+
+### Connect your Palworld server
+
+Set the REST and/or RCON connection so the panel shows live metrics and players
+(the API prefers REST and falls back to RCON). Both are optional — until one is
+configured, the dashboard shows a friendly "connect your server" state.
+
+| Variable | Notes |
+| --- | --- |
+| `PALWORLD_REST_URL` | e.g. `http://<game-ip>:8212` — needs `RESTAPIEnabled=True` |
+| `PALWORLD_REST_PASSWORD` | the server's `AdminPassword` |
+| `PALWORLD_RCON_HOST` / `PALWORLD_RCON_PORT` | needs `RCONEnabled=True` |
+| `PALWORLD_RCON_PASSWORD` | the server's `AdminPassword` |
 
 ### HTTPS
 

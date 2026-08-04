@@ -1,5 +1,10 @@
 import { z } from 'zod'
 
+/** Coerce empty-string env values (as Compose injects) to `undefined`. */
+function emptyToUndefined<T extends z.ZodTypeAny>(schema: T) {
+  return z.preprocess((v) => (v === '' ? undefined : v), schema)
+}
+
 const envSchema = z.object({
   API_HOST: z.string().default('0.0.0.0'),
   API_PORT: z.coerce.number().int().positive().default(4000),
@@ -20,6 +25,15 @@ const envSchema = z.object({
     .string()
     .optional()
     .transform((v) => (v === undefined ? undefined : v === 'true')),
+
+  // ---- Palworld server connection (packages/sdk) ----
+  // Compose injects empty strings for unset vars; treat "" as absent.
+  PALWORLD_REST_URL: emptyToUndefined(z.string().url().optional()),
+  PALWORLD_REST_USERNAME: z.string().default('admin'),
+  PALWORLD_REST_PASSWORD: emptyToUndefined(z.string().optional()),
+  PALWORLD_RCON_HOST: emptyToUndefined(z.string().optional()),
+  PALWORLD_RCON_PORT: z.coerce.number().int().positive().default(25575),
+  PALWORLD_RCON_PASSWORD: emptyToUndefined(z.string().optional()),
 })
 
 export type Env = z.infer<typeof envSchema>

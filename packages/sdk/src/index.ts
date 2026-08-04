@@ -1,2 +1,6 @@
 export * from './client'
 export * from './types'
+export { PalworldRestClient } from './rest/client'
+export { RestClient, RestError, type RestClientOptions } from './rest/http'
+export { PalworldRconClient } from './rcon/client'
+export { RconConnection, type RconConnectionOptions } from './rcon/connection'
