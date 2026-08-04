@@ -27,4 +27,10 @@ export async function playerRoutes(app: FastifyInstance): Promise<void> {
     { preHandler: authenticate },
     (req, reply) => runCommand(reply, () => app.palworld.ban(req.params.userId)),
   )
+
+  app.post<{ Params: { userId: string } }>(
+    '/players/:userId/unban',
+    { preHandler: authenticate },
+    (req, reply) => runCommand(reply, () => app.palworld.unban(req.params.userId)),
+  )
 }

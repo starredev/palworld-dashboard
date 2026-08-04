@@ -117,6 +117,13 @@ export const api = {
     })
   },
 
+  unbanPlayer(userId: string): Promise<CommandResult> {
+    return apiFetch(`/players/${encodeURIComponent(userId)}/unban`, {
+      method: 'POST',
+      schema: commandResultSchema,
+    })
+  },
+
   getBackups(): Promise<BackupsResponse> {
     return apiFetch('/backups', { schema: backupsResponseSchema })
   },

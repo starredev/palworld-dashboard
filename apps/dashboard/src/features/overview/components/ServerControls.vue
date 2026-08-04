@@ -1,15 +1,21 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { Megaphone, Save, Power, Loader2 } from 'lucide-vue-next'
+import { Megaphone, Save, Power, Loader2, UserCheck } from 'lucide-vue-next'
 import { Card, CardHeader, CardTitle, CardContent, Button, Input, ConfirmDialog } from '@tsuki/ui'
 import { useServerCommands } from '@/composables/use-commands'
 
-const { broadcast, save, shutdown } = useServerCommands()
+const { broadcast, save, shutdown, unban } = useServerCommands()
 
 const message = ref('')
 function sendBroadcast(): void {
   if (!message.value.trim()) return
   broadcast.mutate(message.value, { onSuccess: () => (message.value = '') })
+}
+
+const unbanId = ref('')
+function sendUnban(): void {
+  if (!unbanId.value.trim()) return
+  unban.mutate(unbanId.value.trim(), { onSuccess: () => (unbanId.value = '') })
 }
 
 const shutdownOpen = ref(false)
@@ -36,6 +42,19 @@ const broadcasting = computed(() => broadcast.isPending.value)
           <Loader2 v-if="broadcasting" class="animate-spin" />
           <Megaphone v-else />
           Broadcast
+        </Button>
+      </form>
+
+      <form class="flex flex-col gap-2 sm:flex-row" @submit.prevent="sendUnban">
+        <Input v-model="unbanId" placeholder="Unban a player by Steam ID…" />
+        <Button
+          type="submit"
+          variant="outline"
+          :disabled="unban.isPending.value || !unbanId.trim()"
+        >
+          <Loader2 v-if="unban.isPending.value" class="animate-spin" />
+          <UserCheck v-else />
+          Unban
         </Button>
       </form>
 

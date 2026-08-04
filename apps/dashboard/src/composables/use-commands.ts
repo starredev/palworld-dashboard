@@ -19,6 +19,7 @@ export function useServerCommands() {
     mutationFn: (userId: string) => api.banPlayer(userId),
     onSuccess: refreshPlayers,
   })
+  const unban = useMutation({ mutationFn: (userId: string) => api.unbanPlayer(userId) })
 
-  return { broadcast, save, shutdown, kick, ban }
+  return { broadcast, save, shutdown, kick, ban, unban }
 }
