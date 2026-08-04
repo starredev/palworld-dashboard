@@ -44,6 +44,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: 'Live map' },
       },
       {
+        path: 'insights',
+        name: 'insights',
+        component: () => import('@/features/insights/pages/InsightsPage.vue'),
+        meta: { title: 'Insights' },
+      },
+      {
         path: 'config',
         name: 'config',
         component: () => import('@/features/config/pages/ServerConfigPage.vue'),

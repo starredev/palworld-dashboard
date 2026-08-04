@@ -4,6 +4,7 @@ import {
   Shield,
   PawPrint,
   Map,
+  LineChart,
   SlidersHorizontal,
   Archive,
   type LucideIcon,
@@ -22,6 +23,7 @@ export const NAV_ITEMS: NavItem[] = [
   { label: 'Guilds', to: '/guilds', icon: Shield },
   { label: 'Pals', to: '/pals', icon: PawPrint },
   { label: 'Map', to: '/map', icon: Map },
+  { label: 'Insights', to: '/insights', icon: LineChart },
   { label: 'Config', to: '/config', icon: SlidersHorizontal },
   { label: 'Backups', to: '/backups', icon: Archive },
 ]

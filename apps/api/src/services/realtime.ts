@@ -1,6 +1,13 @@
 import type { FastifyBaseLogger } from 'fastify'
 import type { PalworldClient } from '@tsuki/sdk'
-import type { PalPlayer, RealtimeMessage, ServerEvent, ServerEventKind } from '@tsuki/types'
+import type {
+  MetricsSample,
+  PalPlayer,
+  PalServerMetrics,
+  RealtimeMessage,
+  ServerEvent,
+  ServerEventKind,
+} from '@tsuki/types'
 
 export interface Broadcastable {
   send(data: string): void
@@ -9,6 +16,7 @@ export interface Broadcastable {
 
 const OPEN = 1
 const MAX_EVENTS = 50
+const MAX_SAMPLES = 2000
 const playerKey = (p: PalPlayer): string => p.userId ?? p.playerId ?? p.name
 
 /**
@@ -22,6 +30,7 @@ export class RealtimeBroadcaster {
   private readonly last = new Map<RealtimeMessage['type'], RealtimeMessage>()
   private readonly recentEvents: ServerEvent[] = []
   private readonly eventListeners = new Set<(event: ServerEvent) => void>()
+  private readonly history: MetricsSample[] = []
 
   private prevReachable: boolean | null = null
   private prevPlayers: Map<string, string> | null = null
@@ -63,6 +72,16 @@ export class RealtimeBroadcaster {
     this.eventListeners.add(listener)
   }
 
+  /** In-memory metrics history (resets on restart). */
+  getHistory(): MetricsSample[] {
+    return this.history
+  }
+
+  private record(metrics: PalServerMetrics): void {
+    this.history.push({ t: Date.now(), fps: metrics.fps, players: metrics.players })
+    if (this.history.length > MAX_SAMPLES) this.history.shift()
+  }
+
   private async poll(): Promise<void> {
     if (this.polling) return
     this.polling = true
@@ -75,9 +94,11 @@ export class RealtimeBroadcaster {
         this.prevPlayers = null
         return
       }
-      await this.safe(async () =>
-        this.emitState({ type: 'metrics', data: await this.palworld.getMetrics() }),
-      )
+      await this.safe(async () => {
+        const metrics = await this.palworld.getMetrics()
+        this.emitState({ type: 'metrics', data: metrics })
+        this.record(metrics)
+      })
       await this.safe(async () => {
         const { players } = await this.palworld.getPlayers()
         this.detectPlayers(players)
