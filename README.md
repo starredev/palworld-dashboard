@@ -109,6 +109,13 @@ down so your container's `restart: unless-stopped` policy brings it back with th
 new settings — no Docker socket access required. Without `PALWORLD_DATA_DIR` the
 page stays a safe client-side generator (copy/download).
 
+### Backups
+
+With `PALWORLD_DATA_DIR` mounted (see above), the **Backups** page can snapshot,
+download and restore your world saves. Backups are stored in a `tsuki-backups`
+volume; a restore takes a `pre-restore` safety backup first and needs a server
+restart to take effect.
+
 ### HTTPS
 
 Terminate TLS with a reverse proxy in front (Caddy, Traefik, or nginx + certbot)
