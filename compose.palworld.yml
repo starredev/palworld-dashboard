@@ -1,0 +1,19 @@
+# Overlay: connect the Tsuki API to an existing Palworld server stack's network
+# so it can reach the (unpublished) REST API at http://<palworld-service>:8212.
+#
+# Usage:
+#   1. Find the Palworld stack's docker network:  docker network ls
+#   2. In .env set PALWORLD_NETWORK to that name (e.g. palworld_default),
+#      plus PALWORLD_REST_URL + PALWORLD_REST_PASSWORD.
+#   3. docker compose -f compose.yml -f compose.palworld.yml up -d --build
+
+services:
+  api:
+    networks:
+      - default
+      - palworld
+
+networks:
+  palworld:
+    external: true
+    name: ${PALWORLD_NETWORK:-palworld_default}
