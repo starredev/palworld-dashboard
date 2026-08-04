@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, Map, Settings, type LucideIcon } from 'lucide-vue-next'
+import { LayoutDashboard, Users, Map, SlidersHorizontal, type LucideIcon } from 'lucide-vue-next'
 
 export interface NavItem {
   label: string
@@ -11,5 +11,5 @@ export const NAV_ITEMS: NavItem[] = [
   { label: 'Overview', to: '/', icon: LayoutDashboard },
   { label: 'Players', to: '/players', icon: Users },
   { label: 'Map', to: '/map', icon: Map },
-  { label: 'Settings', to: '/settings', icon: Settings },
+  { label: 'Config', to: '/config', icon: SlidersHorizontal },
 ]

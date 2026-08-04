@@ -32,10 +32,10 @@ const routes: RouteRecordRaw[] = [
         meta: { title: 'Live map' },
       },
       {
-        path: 'settings',
-        name: 'settings',
-        component: () => import('@/features/settings/pages/SettingsPage.vue'),
-        meta: { title: 'Settings' },
+        path: 'config',
+        name: 'config',
+        component: () => import('@/features/config/pages/ServerConfigPage.vue'),
+        meta: { title: 'Server config' },
       },
       {
         path: ':pathMatch(.*)*',
