@@ -7,3 +7,22 @@ export const appConfigSchema = z.object({
 })
 
 export type AppConfig = z.infer<typeof appConfigSchema>
+
+/** The live PalWorldSettings.ini, when a data volume is mounted. */
+export const gameConfigSchema = z.object({
+  available: z.boolean(),
+  content: z.string().nullable(),
+})
+export type GameConfig = z.infer<typeof gameConfigSchema>
+
+export const gameConfigUpdateSchema = z.object({
+  /** The OptionSettings body (contents inside the outer parentheses). */
+  body: z.string().min(1),
+})
+export type GameConfigUpdate = z.infer<typeof gameConfigUpdateSchema>
+
+export const gameConfigWriteResultSchema = z.object({
+  ok: z.boolean(),
+  path: z.string(),
+})
+export type GameConfigWriteResult = z.infer<typeof gameConfigWriteResultSchema>

@@ -38,6 +38,13 @@ const envSchema = z.object({
   // ---- Dashboard runtime config (served to the browser via /api/config) ----
   // Absolute URL of the live-map to embed. Empty => dashboard falls back to :3001.
   LIVEMAP_URL: emptyToUndefined(z.string().url().optional()),
+
+  // ---- Live PalWorldSettings.ini editing (optional) ----
+  // Path INSIDE the api container to the server's ini. Mount the Palworld data
+  // dir to make it available; if the file is absent the feature stays hidden.
+  PALWORLD_INI_PATH: z
+    .string()
+    .default('/palworld-data/Pal/Saved/Config/LinuxServer/PalWorldSettings.ini'),
 })
 
 export type Env = z.infer<typeof envSchema>

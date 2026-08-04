@@ -33,3 +33,7 @@ test-results/
 .cache/
 .vite/
 .turbo/
+
+# Local data / mounts
+.data/
+palworld-data/

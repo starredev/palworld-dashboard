@@ -1,6 +1,8 @@
 import {
   appConfigSchema,
   commandResultSchema,
+  gameConfigSchema,
+  gameConfigWriteResultSchema,
   healthResponseSchema,
   palServerInfoSchema,
   palServerMetricsSchema,
@@ -9,6 +11,8 @@ import {
   sessionResponseSchema,
   type AppConfig,
   type CommandResult,
+  type GameConfig,
+  type GameConfigWriteResult,
   type HealthResponse,
   type PalServerInfo,
   type PalServerMetrics,
@@ -29,6 +33,18 @@ export const api = {
 
   getConfig(): Promise<AppConfig> {
     return apiFetch('/config', { schema: appConfigSchema })
+  },
+
+  getGameConfig(): Promise<GameConfig> {
+    return apiFetch('/server/config', { schema: gameConfigSchema })
+  },
+
+  saveGameConfig(body: string): Promise<GameConfigWriteResult> {
+    return apiFetch('/server/config', {
+      method: 'PUT',
+      body: JSON.stringify({ body }),
+      schema: gameConfigWriteResultSchema,
+    })
   },
 
   login(password: string): Promise<SessionResponse> {

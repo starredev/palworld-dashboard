@@ -12,6 +12,11 @@ services:
     networks:
       - default
       - palworld
+    # Optional: mount the Palworld data dir to edit PalWorldSettings.ini live.
+    # Set PALWORLD_DATA_DIR in .env to the host path of the game server's data
+    # (the dir the palworld container mounts, e.g. /home/palworld/.../palworld).
+    volumes:
+      - ${PALWORLD_DATA_DIR:-./palworld-data}:/palworld-data
 
 networks:
   palworld:

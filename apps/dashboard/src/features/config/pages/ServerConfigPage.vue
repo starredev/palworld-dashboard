@@ -6,8 +6,9 @@ import { PRESETS } from '../presets'
 import { useConfigEditor } from '../use-config-editor'
 import ConfigField from '../components/ConfigField.vue'
 import ConfigOutput from '../components/ConfigOutput.vue'
+import ServerConfigActions from '../components/ServerConfigActions.vue'
 
-const { values, activePreset, applyPreset, importText, ini, changedCount } = useConfigEditor()
+const { values, activePreset, applyPreset, importText, ini, body, changedCount } = useConfigEditor()
 
 const grouped = computed(() =>
   GROUPS.map((group) => ({ group, fields: FIELDS.filter((f) => f.group === group) })),
@@ -23,6 +24,8 @@ const grouped = computed(() =>
         the server to apply.
       </p>
     </header>
+
+    <ServerConfigActions :body="body" @load="importText" />
 
     <div class="flex flex-wrap gap-2">
       <Button

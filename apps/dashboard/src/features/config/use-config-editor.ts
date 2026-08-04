@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue'
 import { DEFAULT_OPTION_SETTINGS } from './default-ini'
-import { parseBody, parseConfig, toIni } from './serialize'
+import { parseBody, parseConfig, toBody, toIni } from './serialize'
 import { PRESETS } from './presets'
 
 /** Reactive state for the config editor: a raw key→value map + original order. */
@@ -35,9 +35,10 @@ export function useConfigEditor() {
   }
 
   const ini = computed(() => toIni({ order: order.value, values: values.value }))
+  const body = computed(() => toBody({ order: order.value, values: values.value }))
   const changedCount = computed(
     () => order.value.filter((k) => values.value[k] !== base.values[k]).length,
   )
 
-  return { values, activePreset, applyPreset, importText, set, ini, changedCount }
+  return { values, activePreset, applyPreset, importText, set, ini, body, changedCount }
 }

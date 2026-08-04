@@ -93,6 +93,22 @@ published port). Override with the `VITE_LIVEMAP_URL` build arg / env if it live
 elsewhere. If the live-map blocks embedding, the page's "Open in new tab" link
 still works.
 
+### Live config editing (optional)
+
+The **Config** page can edit your server's real `PalWorldSettings.ini`. Mount the
+game server's data dir into the API (via the overlay) and set the host path:
+
+```bash
+# in .env
+PALWORLD_DATA_DIR=/path/to/your/palworld   # the dir the game container mounts
+```
+
+Then the Config page auto-loads the live file, **Save to server** writes it back
+(with a `.bak` backup, preserving unknown keys), and **Restart** shuts the server
+down so your container's `restart: unless-stopped` policy brings it back with the
+new settings — no Docker socket access required. Without `PALWORLD_DATA_DIR` the
+page stays a safe client-side generator (copy/download).
+
 ### HTTPS
 
 Terminate TLS with a reverse proxy in front (Caddy, Traefik, or nginx + certbot)
