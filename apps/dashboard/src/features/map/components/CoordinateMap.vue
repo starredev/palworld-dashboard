@@ -66,9 +66,26 @@ const projected = computed(() => {
 })
 
 // ---- pan / zoom via the SVG viewBox ----
+const wrapperRef = ref<HTMLElement>()
 const svgRef = ref<SVGSVGElement>()
 const view = reactive({ x: 0, y: 0, w: SIZE, h: SIZE })
 const dragging = ref(false)
+const hovered = ref<{ point: MapPoint; x: number; y: number } | null>(null)
+
+function onHover(point: MapPoint, e: MouseEvent): void {
+  if (dragging.value) return
+  const rect = wrapperRef.value?.getBoundingClientRect()
+  if (!rect) return
+  hovered.value = { point, x: e.clientX - rect.left, y: e.clientY - rect.top }
+}
+
+function subLabel(p: MapPoint): string {
+  const parts: string[] = []
+  if (p.detail) parts.push(p.detail)
+  if (p.level != null) parts.push(`Lv ${p.level}`)
+  if (p.guildName) parts.push(p.guildName)
+  return parts.join(' · ')
+}
 const zoomScale = computed(() => view.w / SIZE) // keep markers constant on screen
 
 function clampView(): void {
@@ -100,6 +117,7 @@ function onWheel(e: WheelEvent): void {
 
 function onPointerDown(e: PointerEvent): void {
   dragging.value = true
+  hovered.value = null
   ;(e.target as Element).setPointerCapture?.(e.pointerId)
 }
 function onPointerMove(e: PointerEvent): void {
@@ -119,18 +137,11 @@ function reset(): void {
   view.w = SIZE
   view.h = SIZE
 }
-
-function tooltip(p: MapPoint): string {
-  const parts = [p.name]
-  if (p.detail) parts.push(`(${p.detail})`)
-  if (p.level != null) parts.push(`· Lv ${p.level}`)
-  if (p.guildName) parts.push(`· ${p.guildName}`)
-  return parts.join(' ')
-}
 </script>
 
 <template>
   <div
+    ref="wrapperRef"
     class="relative aspect-square w-full overflow-hidden rounded-2xl border border-border bg-background/60"
   >
     <svg
@@ -172,11 +183,23 @@ function tooltip(p: MapPoint): string {
           stroke="#0a0a0a"
           stroke-opacity="0.6"
           :stroke-width="2.5 * zoomScale"
-        >
-          <title>{{ tooltip(p.point) }}</title>
-        </circle>
+          class="cursor-pointer"
+          @mousemove="onHover(p.point, $event)"
+          @mouseleave="hovered = null"
+        />
       </g>
     </svg>
+
+    <div
+      v-if="hovered"
+      class="pointer-events-none absolute z-10 max-w-[16rem] rounded-lg border border-border bg-card/95 px-2.5 py-1.5 text-xs shadow-xl backdrop-blur"
+      :style="{ left: `${hovered.x + 12}px`, top: `${hovered.y + 12}px` }"
+    >
+      <span class="font-medium">{{ hovered.point.name }}</span>
+      <span v-if="subLabel(hovered.point)" class="block text-muted-foreground">
+        {{ subLabel(hovered.point) }}
+      </span>
+    </div>
 
     <div class="absolute right-3 top-3 flex flex-col gap-1.5">
       <button
