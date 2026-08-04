@@ -4,6 +4,7 @@ import { Users, Gauge, Clock, CalendarDays, PlugZap, ServerOff } from 'lucide-vu
 import { formatUptime } from '@tsuki/shared'
 import { useServerOverview } from '@/composables/use-server'
 import StatCard from '../components/StatCard.vue'
+import ServerControls from '../components/ServerControls.vue'
 import PagePlaceholder from '@/components/common/PagePlaceholder.vue'
 
 const { status, metrics, info } = useServerOverview()
@@ -11,6 +12,7 @@ const { status, metrics, info } = useServerOverview()
 const statusData = computed(() => status.data.value)
 const notConfigured = computed(() => statusData.value && !statusData.value.configured)
 const offline = computed(() => statusData.value?.configured && !statusData.value.reachable)
+const reachable = computed(() => statusData.value?.reachable === true)
 
 const m = computed(() => metrics.data.value)
 const metricsLoading = computed(
@@ -62,5 +64,7 @@ const inGameDay = computed(() => m.value?.days ?? undefined)
         :loading="metricsLoading"
       />
     </div>
+
+    <ServerControls v-if="reachable" />
   </section>
 </template>

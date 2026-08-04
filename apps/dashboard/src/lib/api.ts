@@ -1,5 +1,6 @@
 import {
   appConfigSchema,
+  commandResultSchema,
   healthResponseSchema,
   palServerInfoSchema,
   palServerMetricsSchema,
@@ -7,6 +8,7 @@ import {
   playersResponseSchema,
   sessionResponseSchema,
   type AppConfig,
+  type CommandResult,
   type HealthResponse,
   type PalServerInfo,
   type PalServerMetrics,
@@ -59,5 +61,39 @@ export const api = {
 
   getPlayers(): Promise<PlayersResponse> {
     return apiFetch('/players', { schema: playersResponseSchema })
+  },
+
+  broadcast(message: string): Promise<CommandResult> {
+    return apiFetch('/commands/broadcast', {
+      method: 'POST',
+      body: JSON.stringify({ message }),
+      schema: commandResultSchema,
+    })
+  },
+
+  save(): Promise<CommandResult> {
+    return apiFetch('/commands/save', { method: 'POST', schema: commandResultSchema })
+  },
+
+  shutdown(input: { seconds: number; message: string }): Promise<CommandResult> {
+    return apiFetch('/commands/shutdown', {
+      method: 'POST',
+      body: JSON.stringify(input),
+      schema: commandResultSchema,
+    })
+  },
+
+  kickPlayer(userId: string): Promise<CommandResult> {
+    return apiFetch(`/players/${encodeURIComponent(userId)}/kick`, {
+      method: 'POST',
+      schema: commandResultSchema,
+    })
+  },
+
+  banPlayer(userId: string): Promise<CommandResult> {
+    return apiFetch(`/players/${encodeURIComponent(userId)}/ban`, {
+      method: 'POST',
+      schema: commandResultSchema,
+    })
   },
 }

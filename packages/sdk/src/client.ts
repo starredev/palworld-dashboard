@@ -85,6 +85,27 @@ export class PalworldClient {
     ).then(({ source }) => ({ source }))
   }
 
+  unban(userId: string): Promise<{ source: PalSource }> {
+    return this.prefer(
+      (r) => r.unban(userId),
+      (c) => c.unban(userId).then(() => undefined),
+    ).then(({ source }) => ({ source }))
+  }
+
+  save(): Promise<{ source: PalSource }> {
+    return this.prefer(
+      (r) => r.save(),
+      (c) => c.save().then(() => undefined),
+    ).then(({ source }) => ({ source }))
+  }
+
+  shutdown(seconds: number, message: string): Promise<{ source: PalSource }> {
+    return this.prefer(
+      (r) => r.shutdown(seconds, message),
+      (c) => c.shutdown(seconds, message).then(() => undefined),
+    ).then(({ source }) => ({ source }))
+  }
+
   /** Run a REST op, falling back to an RCON op; report which source answered. */
   private async prefer<T>(
     restFn: (rest: PalworldRestClient) => Promise<T>,

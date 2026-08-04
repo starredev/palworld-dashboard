@@ -81,8 +81,16 @@ export class PalworldRestClient {
     return this.http.post(`${API_PREFIX}/ban`, { userid: userId, message })
   }
 
+  unban(userId: string): Promise<void> {
+    return this.http.post(`${API_PREFIX}/unban`, { userid: userId })
+  }
+
   save(): Promise<void> {
     return this.http.post(`${API_PREFIX}/save`)
+  }
+
+  shutdown(waittime: number, message: string): Promise<void> {
+    return this.http.post(`${API_PREFIX}/shutdown`, { waittime, message })
   }
 
   async ping(): Promise<boolean> {

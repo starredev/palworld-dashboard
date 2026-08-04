@@ -40,8 +40,17 @@ export class PalworldRconClient {
     return this.run((c) => c.exec(`BanPlayer ${userId}`))
   }
 
+  unban(userId: string): Promise<string> {
+    return this.run((c) => c.exec(`UnBanPlayer ${userId}`))
+  }
+
   save(): Promise<string> {
     return this.run((c) => c.exec('Save'))
+  }
+
+  shutdown(seconds: number, message: string): Promise<string> {
+    // RCON mangles spaces in the message, so collapse them to underscores.
+    return this.run((c) => c.exec(`Shutdown ${seconds} ${message.replace(/\s+/g, '_')}`))
   }
 
   /** Verify the connection + credentials are valid. */

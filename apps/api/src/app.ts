@@ -10,6 +10,7 @@ import { configRoutes } from './routes/config'
 import { authRoutes } from './routes/auth'
 import { serverRoutes } from './routes/server'
 import { playerRoutes } from './routes/players'
+import { commandRoutes } from './routes/commands'
 import { wsRoutes } from './routes/ws'
 
 /** Build a fully-configured Fastify instance (without starting to listen). */
@@ -45,6 +46,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(authRoutes, { prefix: '/api' })
   await app.register(serverRoutes, { prefix: '/api' })
   await app.register(playerRoutes, { prefix: '/api' })
+  await app.register(commandRoutes, { prefix: '/api' })
   await app.register(wsRoutes, { prefix: '/api' })
 
   app.get('/', async () => ({ name: APP_NAME, docs: '/api/health' }))
