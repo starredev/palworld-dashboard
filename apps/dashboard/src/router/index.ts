@@ -26,6 +26,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: 'Players' },
       },
       {
+        path: 'map',
+        name: 'map',
+        component: () => import('@/features/map/pages/MapPage.vue'),
+        meta: { title: 'Live map' },
+      },
+      {
         path: 'settings',
         name: 'settings',
         component: () => import('@/features/settings/pages/SettingsPage.vue'),

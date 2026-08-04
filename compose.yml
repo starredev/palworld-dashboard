@@ -45,6 +45,8 @@ services:
       args:
         # Same-origin — nginx proxies /api to the api service. Leave as-is.
         VITE_API_URL: /api
+        # Absolute URL of the live-map. Empty => same host on :3001 (its default port).
+        VITE_LIVEMAP_URL: ${VITE_LIVEMAP_URL:-}
     ports:
       # The ONLY public entrypoint. Put a TLS proxy in front for HTTPS.
       - '${HTTP_PORT:-80}:80'

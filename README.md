@@ -85,6 +85,14 @@ configured, the dashboard shows a friendly "connect your server" state.
 | `PALWORLD_RCON_HOST` / `PALWORLD_RCON_PORT` | needs `RCONEnabled=True`                                   |
 | `PALWORLD_RCON_PASSWORD`                    | the server's `AdminPassword`                               |
 
+### Live map
+
+The **Map** page embeds [palworld-live-map](https://github.com/lukehollanddev/palworld-live-map)
+if you run it. By default it points at the same host on port `3001` (its usual
+published port). Override with the `VITE_LIVEMAP_URL` build arg / env if it lives
+elsewhere. If the live-map blocks embedding, the page's "Open in new tab" link
+still works.
+
 ### HTTPS
 
 Terminate TLS with a reverse proxy in front (Caddy, Traefik, or nginx + certbot)

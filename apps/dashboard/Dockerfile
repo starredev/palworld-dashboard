@@ -22,6 +22,9 @@ FROM deps AS build
 # Baked into the bundle at build time — must be reachable from the browser.
 ARG VITE_API_URL=http://localhost:4000
 ENV VITE_API_URL=$VITE_API_URL
+# Optional: absolute URL of the palworld-live-map. Empty = same host on :3001.
+ARG VITE_LIVEMAP_URL=
+ENV VITE_LIVEMAP_URL=$VITE_LIVEMAP_URL
 COPY packages ./packages
 COPY apps/dashboard ./apps/dashboard
 RUN pnpm --filter @tsuki/dashboard build

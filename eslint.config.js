@@ -25,6 +25,9 @@ export default ts.config(
     rules: {
       'vue/multi-word-component-names': 'off',
       'vue/require-default-prop': 'off',
+      // TypeScript already checks for undefined identifiers; no-undef is redundant
+      // and misfires on browser globals (window, WebSocket) inside .vue files.
+      'no-undef': 'off',
       '@typescript-eslint/no-unused-vars': [
         'error',
         { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
