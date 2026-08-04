@@ -56,6 +56,9 @@ const envSchema = z.object({
   PALWORLD_SAVE_DIR: z.string().default('/palworld-data/Pal/Saved/SaveGames'),
   BACKUP_DIR: z.string().default('/backups'),
 
+  // ---- Logs viewer (optional) ----
+  PALWORLD_LOG_PATH: z.string().default('/palworld-data/Pal/Saved/Logs/Pal.log'),
+
   // ---- Guilds & Pals via the live-map's GameData API (optional) ----
   GAMEDATA_URL: emptyToUndefined(z.string().url().optional()),
   GAMEDATA_STATE_PATH: z.string().default('/api/state'),

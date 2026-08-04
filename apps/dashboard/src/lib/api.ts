@@ -7,6 +7,7 @@ import {
   palsResponseSchema,
   mapResponseSchema,
   metricsHistoryResponseSchema,
+  logsResponseSchema,
   gameConfigSchema,
   gameConfigWriteResultSchema,
   healthResponseSchema,
@@ -23,6 +24,7 @@ import {
   type GameConfigWriteResult,
   type GuildsResponse,
   type HealthResponse,
+  type LogsResponse,
   type MapResponse,
   type MetricsHistoryResponse,
   type PalsResponse,
@@ -166,5 +168,9 @@ export const api = {
 
   getMetricsHistory(): Promise<MetricsHistoryResponse> {
     return apiFetch('/metrics/history', { schema: metricsHistoryResponseSchema })
+  },
+
+  getLogs(lines = 1000): Promise<LogsResponse> {
+    return apiFetch(`/logs?lines=${lines}`, { schema: logsResponseSchema })
   },
 }

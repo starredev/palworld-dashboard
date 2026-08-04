@@ -6,6 +6,7 @@ import {
   Map,
   LineChart,
   SlidersHorizontal,
+  ScrollText,
   Archive,
   type LucideIcon,
 } from 'lucide-vue-next'
@@ -25,5 +26,6 @@ export const NAV_ITEMS: NavItem[] = [
   { label: 'Map', to: '/map', icon: Map },
   { label: 'Insights', to: '/insights', icon: LineChart },
   { label: 'Config', to: '/config', icon: SlidersHorizontal },
+  { label: 'Logs', to: '/logs', icon: ScrollText },
   { label: 'Backups', to: '/backups', icon: Archive },
 ]
