@@ -4,10 +4,12 @@ import { APP_NAME } from '@tsuki/shared'
 import { loadEnv } from './config/env'
 import { registerAuth } from './plugins/auth'
 import { registerPalworld } from './plugins/palworld'
+import { registerRealtime } from './plugins/realtime'
 import { healthRoutes } from './routes/health'
 import { authRoutes } from './routes/auth'
 import { serverRoutes } from './routes/server'
 import { playerRoutes } from './routes/players'
+import { wsRoutes } from './routes/ws'
 
 /** Build a fully-configured Fastify instance (without starting to listen). */
 export async function buildApp(): Promise<FastifyInstance> {
@@ -33,6 +35,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   })
   await registerAuth(app)
   await registerPalworld(app)
+  await registerRealtime(app)
 
   // All HTTP endpoints live under /api so a single reverse proxy can serve the
   // dashboard and forward /api to this service (same-origin, no browser CORS).
@@ -40,6 +43,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(authRoutes, { prefix: '/api' })
   await app.register(serverRoutes, { prefix: '/api' })
   await app.register(playerRoutes, { prefix: '/api' })
+  await app.register(wsRoutes, { prefix: '/api' })
 
   app.get('/', async () => ({ name: APP_NAME, docs: '/api/health' }))
 

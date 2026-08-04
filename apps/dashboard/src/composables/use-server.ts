@@ -2,12 +2,14 @@ import { computed } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
 import { api } from '@/lib/api'
 
-/** Connection status — cheap poll that gates the richer queries below. */
+/**
+ * Connection status. Seeded by an initial fetch, then kept fresh by the
+ * realtime WebSocket (see use-realtime), so no client polling is needed.
+ */
 export function useServerStatus() {
   return useQuery({
     queryKey: ['server', 'status'],
     queryFn: () => api.getServerStatus(),
-    refetchInterval: 15_000,
   })
 }
 
@@ -19,7 +21,6 @@ export function useServerOverview() {
   const metrics = useQuery({
     queryKey: ['server', 'metrics'],
     queryFn: () => api.getServerMetrics(),
-    refetchInterval: 10_000,
     enabled,
   })
 

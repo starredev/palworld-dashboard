@@ -3,8 +3,12 @@ import { ref } from 'vue'
 import { RouterView } from 'vue-router'
 import AppSidebar from '@/components/layout/AppSidebar.vue'
 import AppTopbar from '@/components/layout/AppTopbar.vue'
+import { useRealtime } from '@/composables/use-realtime'
 
 const sidebarOpen = ref(false)
+
+// One WebSocket for the whole authed app; pushes live data into the query cache.
+const { connected } = useRealtime()
 </script>
 
 <template>
@@ -25,7 +29,7 @@ const sidebarOpen = ref(false)
     </Transition>
 
     <div class="flex min-w-0 flex-1 flex-col">
-      <AppTopbar @toggle-sidebar="sidebarOpen = !sidebarOpen" />
+      <AppTopbar :live="connected" @toggle-sidebar="sidebarOpen = !sidebarOpen" />
       <main class="flex-1 overflow-y-auto p-4 lg:p-6">
         <div class="mx-auto w-full max-w-6xl">
           <RouterView v-slot="{ Component }">

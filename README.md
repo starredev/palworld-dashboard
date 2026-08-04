@@ -78,12 +78,12 @@ Set the REST and/or RCON connection so the panel shows live metrics and players
 (the API prefers REST and falls back to RCON). Both are optional — until one is
 configured, the dashboard shows a friendly "connect your server" state.
 
-| Variable | Notes |
-| --- | --- |
-| `PALWORLD_REST_URL` | e.g. `http://<game-ip>:8212` — needs `RESTAPIEnabled=True` |
-| `PALWORLD_REST_PASSWORD` | the server's `AdminPassword` |
-| `PALWORLD_RCON_HOST` / `PALWORLD_RCON_PORT` | needs `RCONEnabled=True` |
-| `PALWORLD_RCON_PASSWORD` | the server's `AdminPassword` |
+| Variable                                    | Notes                                                      |
+| ------------------------------------------- | ---------------------------------------------------------- |
+| `PALWORLD_REST_URL`                         | e.g. `http://<game-ip>:8212` — needs `RESTAPIEnabled=True` |
+| `PALWORLD_REST_PASSWORD`                    | the server's `AdminPassword`                               |
+| `PALWORLD_RCON_HOST` / `PALWORLD_RCON_PORT` | needs `RCONEnabled=True`                                   |
+| `PALWORLD_RCON_PASSWORD`                    | the server's `AdminPassword`                               |
 
 ### HTTPS
 

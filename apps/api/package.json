@@ -15,6 +15,7 @@
     "@fastify/cookie": "^11.0.2",
     "@fastify/cors": "^11.0.0",
     "@fastify/jwt": "^9.0.4",
+    "@fastify/websocket": "^11.0.2",
     "@tsuki/sdk": "workspace:*",
     "@tsuki/shared": "workspace:*",
     "@tsuki/types": "workspace:*",

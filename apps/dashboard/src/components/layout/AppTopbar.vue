@@ -6,6 +6,7 @@ import { StatusDot } from '@tsuki/ui'
 import { useHealth } from '@/composables/use-health'
 
 defineEmits<{ toggleSidebar: [] }>()
+defineProps<{ live?: boolean }>()
 
 const route = useRoute()
 const title = computed(() => (route.meta.title as string | undefined) ?? 'Tsuki Panel')
@@ -31,9 +32,18 @@ const connection = computed(() => {
 
     <h1 class="text-sm font-semibold tracking-tight">{{ title }}</h1>
 
-    <div class="ml-auto flex items-center gap-2 rounded-full border border-border px-3 py-1.5">
-      <StatusDot :tone="connection.tone" :pulse="connection.tone === 'online'" />
-      <span class="text-xs text-muted-foreground">{{ connection.label }}</span>
+    <div class="ml-auto flex items-center gap-2">
+      <div
+        v-if="live"
+        class="flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1.5"
+      >
+        <StatusDot tone="online" pulse />
+        <span class="text-xs font-medium text-emerald-400">Live</span>
+      </div>
+      <div class="flex items-center gap-2 rounded-full border border-border px-3 py-1.5">
+        <StatusDot :tone="connection.tone" :pulse="connection.tone === 'online'" />
+        <span class="text-xs text-muted-foreground">{{ connection.label }}</span>
+      </div>
     </div>
   </header>
 </template>
