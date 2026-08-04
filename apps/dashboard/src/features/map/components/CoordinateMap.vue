@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import { Plus, Minus, Maximize } from 'lucide-vue-next'
 import type { MapPoint, MapPointKind } from '@tsuki/types'
 
@@ -13,14 +13,14 @@ const props = defineProps<{
 
 const SIZE = 1000
 const PAD = 48
-const MIN_W = SIZE * 0.1
+const MAX_ZOOM = 8
 
-const STYLE: Record<MapPointKind, { color: string; r: number }> = {
-  player: { color: '#34d399', r: 9 },
-  base: { color: '#38bdf8', r: 10 },
-  pal: { color: '#fbbf24', r: 5.5 },
-  wild: { color: '#a3a3a3', r: 5 },
-  npc: { color: '#f87171', r: 5 },
+const STYLE: Record<MapPointKind, { color: string; size: number; op: number }> = {
+  player: { color: '#34d399', size: 16, op: 0.95 },
+  base: { color: '#38bdf8', size: 18, op: 0.95 },
+  pal: { color: '#fbbf24', size: 11, op: 0.95 },
+  wild: { color: '#a3a3a3', size: 10, op: 0.6 },
+  npc: { color: '#f87171', size: 10, op: 0.6 },
 }
 
 const shown = computed(() => props.points.filter((p) => props.visible[p.kind]))
@@ -40,13 +40,14 @@ const autoBounds = computed(() => {
   return { minX, maxX, minY, maxY }
 })
 
+/** Point positions in a fixed 0..SIZE space (image mode) or auto-fit (grid mode). */
 const projected = computed(() => {
   if (props.imageUrl && props.bounds) {
     const [xTL, yTL, xBR, yBR] = props.bounds
     return shown.value.map((p) => ({
       point: p,
-      cx: ((p.x - xTL) / (xBR - xTL)) * SIZE,
-      cy: ((p.y - yTL) / (yBR - yTL)) * SIZE,
+      nx: (p.x - xTL) / (xBR - xTL),
+      ny: (p.y - yTL) / (yBR - yTL),
       ...STYLE[p.kind],
     }))
   }
@@ -59,60 +60,68 @@ const projected = computed(() => {
   const offY = (SIZE - rangeY * scale) / 2
   return shown.value.map((p) => ({
     point: p,
-    cx: offX + (p.x - b.minX) * scale,
-    cy: SIZE - (offY + (p.y - b.minY) * scale),
+    nx: (offX + (p.x - b.minX) * scale) / SIZE,
+    ny: (SIZE - (offY + (p.y - b.minY) * scale)) / SIZE,
     ...STYLE[p.kind],
   }))
 })
 
-// ---- pan / zoom via the SVG viewBox ----
+// ---- pan / zoom via GPU-composited CSS transform ----
 const wrapperRef = ref<HTMLElement>()
-const svgRef = ref<SVGSVGElement>()
-const view = reactive({ x: 0, y: 0, w: SIZE, h: SIZE })
+const size = ref(1)
+const view = reactive({ k: 1, tx: 0, ty: 0 })
 const dragging = ref(false)
 const hovered = ref<{ point: MapPoint; x: number; y: number } | null>(null)
 
-function onHover(point: MapPoint, e: MouseEvent): void {
-  if (dragging.value) return
-  const rect = wrapperRef.value?.getBoundingClientRect()
-  if (!rect) return
-  hovered.value = { point, x: e.clientX - rect.left, y: e.clientY - rect.top }
-}
+const layerStyle = computed(() => ({
+  transform: `translate3d(${view.tx}px, ${view.ty}px, 0) scale(${view.k})`,
+  transformOrigin: '0 0',
+  willChange: 'transform',
+}))
 
-function subLabel(p: MapPoint): string {
-  const parts: string[] = []
-  if (p.detail) parts.push(p.detail)
-  if (p.level != null) parts.push(`Lv ${p.level}`)
-  if (p.guildName) parts.push(p.guildName)
-  return parts.join(' · ')
-}
-const zoomScale = computed(() => view.w / SIZE) // keep markers constant on screen
+const markers = computed(() =>
+  projected.value.map((p) => ({
+    ...p,
+    left: view.tx + p.nx * size.value * view.k,
+    top: view.ty + p.ny * size.value * view.k,
+  })),
+)
 
 function clampView(): void {
-  view.w = Math.min(Math.max(view.w, MIN_W), SIZE)
-  view.h = view.w
-  view.x = Math.min(Math.max(view.x, 0), SIZE - view.w)
-  view.y = Math.min(Math.max(view.y, 0), SIZE - view.h)
+  view.k = Math.min(Math.max(view.k, 1), MAX_ZOOM)
+  const min = size.value * (1 - view.k)
+  view.tx = Math.min(Math.max(view.tx, min), 0)
+  view.ty = Math.min(Math.max(view.ty, min), 0)
 }
 
 function zoomAt(px: number, py: number, factor: number): void {
-  const cx = view.x + px * view.w
-  const cy = view.y + py * view.h
-  view.w *= factor
-  view.h = view.w
-  view.x = cx - px * view.w
-  view.y = cy - py * view.h
+  const k2 = Math.min(Math.max(view.k * factor, 1), MAX_ZOOM)
+  view.tx = px - ((px - view.tx) / view.k) * k2
+  view.ty = py - ((py - view.ty) / view.k) * k2
+  view.k = k2
   clampView()
 }
 
 function onWheel(e: WheelEvent): void {
-  const rect = svgRef.value?.getBoundingClientRect()
+  const rect = wrapperRef.value?.getBoundingClientRect()
   if (!rect) return
-  zoomAt(
-    (e.clientX - rect.left) / rect.width,
-    (e.clientY - rect.top) / rect.height,
-    e.deltaY > 0 ? 1.2 : 1 / 1.2,
-  )
+  zoomAt(e.clientX - rect.left, e.clientY - rect.top, e.deltaY < 0 ? 1.2 : 1 / 1.2)
+}
+
+// Coalesce pan updates to one per animation frame.
+let rafId = 0
+let pending: { dx: number; dy: number } | null = null
+function schedulePan(dx: number, dy: number): void {
+  pending = pending ? { dx: pending.dx + dx, dy: pending.dy + dy } : { dx, dy }
+  if (rafId) return
+  rafId = requestAnimationFrame(() => {
+    rafId = 0
+    if (!pending) return
+    view.tx += pending.dx
+    view.ty += pending.dy
+    pending = null
+    clampView()
+  })
 }
 
 function onPointerDown(e: PointerEvent): void {
@@ -121,74 +130,98 @@ function onPointerDown(e: PointerEvent): void {
   ;(e.target as Element).setPointerCapture?.(e.pointerId)
 }
 function onPointerMove(e: PointerEvent): void {
-  if (!dragging.value) return
-  const rect = svgRef.value?.getBoundingClientRect()
-  if (!rect) return
-  view.x -= (e.movementX / rect.width) * view.w
-  view.y -= (e.movementY / rect.height) * view.h
-  clampView()
+  if (dragging.value) schedulePan(e.movementX, e.movementY)
 }
 function onPointerUp(): void {
   dragging.value = false
 }
 function reset(): void {
-  view.x = 0
-  view.y = 0
-  view.w = SIZE
-  view.h = SIZE
+  view.k = 1
+  view.tx = 0
+  view.ty = 0
 }
+
+function onHover(point: MapPoint, e: MouseEvent): void {
+  if (dragging.value) return
+  const rect = wrapperRef.value?.getBoundingClientRect()
+  if (!rect) return
+  hovered.value = { point, x: e.clientX - rect.left, y: e.clientY - rect.top }
+}
+function subLabel(p: MapPoint): string {
+  const parts: string[] = []
+  if (p.detail) parts.push(p.detail)
+  if (p.level != null) parts.push(`Lv ${p.level}`)
+  if (p.guildName) parts.push(p.guildName)
+  return parts.join(' · ')
+}
+
+let ro: ResizeObserver | undefined
+onMounted(() => {
+  const el = wrapperRef.value
+  if (!el) return
+  size.value = el.clientWidth
+  ro = new ResizeObserver(() => {
+    size.value = el.clientWidth
+    clampView()
+  })
+  ro.observe(el)
+})
+onBeforeUnmount(() => ro?.disconnect())
 </script>
 
 <template>
   <div
     ref="wrapperRef"
-    class="relative aspect-square w-full overflow-hidden rounded-2xl border border-border bg-background/60"
+    :class="[
+      'relative aspect-square w-full touch-none select-none overflow-hidden rounded-2xl border border-border bg-background/60',
+      dragging ? 'cursor-grabbing' : 'cursor-grab',
+    ]"
+    @wheel.prevent="onWheel"
+    @pointerdown="onPointerDown"
+    @pointermove="onPointerMove"
+    @pointerup="onPointerUp"
+    @pointerleave="onPointerUp"
   >
-    <svg
-      ref="svgRef"
-      :viewBox="`${view.x} ${view.y} ${view.w} ${view.h}`"
-      :class="[
-        'h-full w-full touch-none select-none',
-        dragging ? 'cursor-grabbing' : 'cursor-grab',
-      ]"
-      @wheel.prevent="onWheel"
-      @pointerdown="onPointerDown"
-      @pointermove="onPointerMove"
-      @pointerup="onPointerUp"
-      @pointerleave="onPointerUp"
-    >
-      <image v-if="imageUrl && bounds" :href="imageUrl" x="0" y="0" :width="SIZE" :height="SIZE" />
-      <template v-else>
-        <defs>
-          <pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse">
-            <path
-              d="M 50 0 L 0 0 0 50"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="0.5"
-              class="text-border/50"
-            />
-          </pattern>
-        </defs>
-        <rect :width="SIZE" :height="SIZE" fill="url(#grid)" />
-      </template>
+    <!-- GPU-transformed background layer (image or grid) -->
+    <div class="absolute inset-0" :style="layerStyle">
+      <img
+        v-if="imageUrl && bounds"
+        :src="imageUrl"
+        alt="Palworld map"
+        draggable="false"
+        class="absolute inset-0 h-full w-full object-cover"
+      />
+      <div
+        v-else
+        class="absolute inset-0"
+        style="
+          background-image:
+            linear-gradient(to right, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+            linear-gradient(to bottom, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+          background-size: 5% 5%;
+        "
+      />
+    </div>
 
-      <g v-for="p in projected" :key="p.point.id">
-        <circle
-          :cx="p.cx"
-          :cy="p.cy"
-          :r="(p.point.kind === 'player' && p.point.online ? p.r + 3 : p.r) * zoomScale"
-          :fill="p.color"
-          :fill-opacity="p.point.kind === 'wild' || p.point.kind === 'npc' ? 0.6 : 0.95"
-          stroke="#0a0a0a"
-          stroke-opacity="0.6"
-          :stroke-width="2.5 * zoomScale"
-          class="cursor-pointer"
-          @mousemove="onHover(p.point, $event)"
-          @mouseleave="hovered = null"
-        />
-      </g>
-    </svg>
+    <!-- Marker overlay (constant screen size) -->
+    <div class="pointer-events-none absolute inset-0">
+      <div
+        v-for="m in markers"
+        :key="m.point.id"
+        class="pointer-events-auto absolute -translate-x-1/2 -translate-y-1/2 cursor-pointer rounded-full"
+        :style="{
+          left: `${m.left}px`,
+          top: `${m.top}px`,
+          width: `${m.size}px`,
+          height: `${m.size}px`,
+          background: m.color,
+          opacity: m.op,
+          border: '2px solid rgba(10,10,10,0.55)',
+        }"
+        @mousemove="onHover(m.point, $event)"
+        @mouseleave="hovered = null"
+      />
+    </div>
 
     <div
       v-if="hovered"
@@ -205,14 +238,14 @@ function reset(): void {
       <button
         class="grid size-8 place-items-center rounded-lg border border-border bg-card/80 backdrop-blur hover:bg-accent"
         aria-label="Zoom in"
-        @click="zoomAt(0.5, 0.5, 1 / 1.4)"
+        @click="zoomAt(size / 2, size / 2, 1.4)"
       >
         <Plus class="size-4" />
       </button>
       <button
         class="grid size-8 place-items-center rounded-lg border border-border bg-card/80 backdrop-blur hover:bg-accent"
         aria-label="Zoom out"
-        @click="zoomAt(0.5, 0.5, 1.4)"
+        @click="zoomAt(size / 2, size / 2, 1 / 1.4)"
       >
         <Minus class="size-4" />
       </button>
