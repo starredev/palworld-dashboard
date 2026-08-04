@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, reactive, ref } from 'vue'
+import { Plus, Minus, Maximize } from 'lucide-vue-next'
 import type { MapPoint, MapPointKind } from '@tsuki/types'
 
 const props = defineProps<{
@@ -12,6 +13,7 @@ const props = defineProps<{
 
 const SIZE = 1000
 const PAD = 48
+const MIN_W = SIZE * 0.1
 
 const STYLE: Record<MapPointKind, { color: string; r: number }> = {
   player: { color: '#34d399', r: 9 },
@@ -39,7 +41,6 @@ const autoBounds = computed(() => {
 })
 
 const projected = computed(() => {
-  // With a map image: project onto the image's world bounds so markers align.
   if (props.imageUrl && props.bounds) {
     const [xTL, yTL, xBR, yBR] = props.bounds
     return shown.value.map((p) => ({
@@ -49,7 +50,6 @@ const projected = computed(() => {
       ...STYLE[p.kind],
     }))
   }
-  // Without image: auto-fit the visible points.
   const b = autoBounds.value
   if (!b) return []
   const rangeX = Math.max(b.maxX - b.minX, 1)
@@ -65,6 +65,61 @@ const projected = computed(() => {
   }))
 })
 
+// ---- pan / zoom via the SVG viewBox ----
+const svgRef = ref<SVGSVGElement>()
+const view = reactive({ x: 0, y: 0, w: SIZE, h: SIZE })
+const dragging = ref(false)
+const zoomScale = computed(() => view.w / SIZE) // keep markers constant on screen
+
+function clampView(): void {
+  view.w = Math.min(Math.max(view.w, MIN_W), SIZE)
+  view.h = view.w
+  view.x = Math.min(Math.max(view.x, 0), SIZE - view.w)
+  view.y = Math.min(Math.max(view.y, 0), SIZE - view.h)
+}
+
+function zoomAt(px: number, py: number, factor: number): void {
+  const cx = view.x + px * view.w
+  const cy = view.y + py * view.h
+  view.w *= factor
+  view.h = view.w
+  view.x = cx - px * view.w
+  view.y = cy - py * view.h
+  clampView()
+}
+
+function onWheel(e: WheelEvent): void {
+  const rect = svgRef.value?.getBoundingClientRect()
+  if (!rect) return
+  zoomAt(
+    (e.clientX - rect.left) / rect.width,
+    (e.clientY - rect.top) / rect.height,
+    e.deltaY > 0 ? 1.2 : 1 / 1.2,
+  )
+}
+
+function onPointerDown(e: PointerEvent): void {
+  dragging.value = true
+  ;(e.target as Element).setPointerCapture?.(e.pointerId)
+}
+function onPointerMove(e: PointerEvent): void {
+  if (!dragging.value) return
+  const rect = svgRef.value?.getBoundingClientRect()
+  if (!rect) return
+  view.x -= (e.movementX / rect.width) * view.w
+  view.y -= (e.movementY / rect.height) * view.h
+  clampView()
+}
+function onPointerUp(): void {
+  dragging.value = false
+}
+function reset(): void {
+  view.x = 0
+  view.y = 0
+  view.w = SIZE
+  view.h = SIZE
+}
+
 function tooltip(p: MapPoint): string {
   const parts = [p.name]
   if (p.detail) parts.push(`(${p.detail})`)
@@ -78,7 +133,19 @@ function tooltip(p: MapPoint): string {
   <div
     class="relative aspect-square w-full overflow-hidden rounded-2xl border border-border bg-background/60"
   >
-    <svg :viewBox="`0 0 ${SIZE} ${SIZE}`" class="h-full w-full">
+    <svg
+      ref="svgRef"
+      :viewBox="`${view.x} ${view.y} ${view.w} ${view.h}`"
+      :class="[
+        'h-full w-full touch-none select-none',
+        dragging ? 'cursor-grabbing' : 'cursor-grab',
+      ]"
+      @wheel.prevent="onWheel"
+      @pointerdown="onPointerDown"
+      @pointermove="onPointerMove"
+      @pointerup="onPointerUp"
+      @pointerleave="onPointerUp"
+    >
       <image v-if="imageUrl && bounds" :href="imageUrl" x="0" y="0" :width="SIZE" :height="SIZE" />
       <template v-else>
         <defs>
@@ -99,16 +166,40 @@ function tooltip(p: MapPoint): string {
         <circle
           :cx="p.cx"
           :cy="p.cy"
-          :r="p.point.kind === 'player' && p.point.online ? p.r + 3 : p.r"
+          :r="(p.point.kind === 'player' && p.point.online ? p.r + 3 : p.r) * zoomScale"
           :fill="p.color"
           :fill-opacity="p.point.kind === 'wild' || p.point.kind === 'npc' ? 0.6 : 0.95"
           stroke="#0a0a0a"
           stroke-opacity="0.6"
-          stroke-width="2.5"
+          :stroke-width="2.5 * zoomScale"
         >
           <title>{{ tooltip(p.point) }}</title>
         </circle>
       </g>
     </svg>
+
+    <div class="absolute right-3 top-3 flex flex-col gap-1.5">
+      <button
+        class="grid size-8 place-items-center rounded-lg border border-border bg-card/80 backdrop-blur hover:bg-accent"
+        aria-label="Zoom in"
+        @click="zoomAt(0.5, 0.5, 1 / 1.4)"
+      >
+        <Plus class="size-4" />
+      </button>
+      <button
+        class="grid size-8 place-items-center rounded-lg border border-border bg-card/80 backdrop-blur hover:bg-accent"
+        aria-label="Zoom out"
+        @click="zoomAt(0.5, 0.5, 1.4)"
+      >
+        <Minus class="size-4" />
+      </button>
+      <button
+        class="grid size-8 place-items-center rounded-lg border border-border bg-card/80 backdrop-blur hover:bg-accent"
+        aria-label="Reset view"
+        @click="reset"
+      >
+        <Maximize class="size-4" />
+      </button>
+    </div>
   </div>
 </template>
