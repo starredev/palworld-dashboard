@@ -1,5 +1,11 @@
 export type FieldType = 'float' | 'int' | 'bool' | 'enum' | 'text' | 'password' | 'platforms'
 
+export interface SliderRange {
+  min: number
+  max: number
+  step: number
+}
+
 export interface ConfigField {
   key: string
   label: string
@@ -7,6 +13,8 @@ export interface ConfigField {
   group: string
   help?: string
   options?: string[]
+  /** When set, a float/int field renders as a slider + number input. */
+  slider?: SliderRange
 }
 
 export const GROUPS = [
@@ -32,7 +40,7 @@ const G = {
 export const PLATFORM_OPTIONS = ['Steam', 'Xbox', 'PS5', 'Mac']
 
 // prettier-ignore
-export const FIELDS: ConfigField[] = [
+const RAW_FIELDS: ConfigField[] = [
   { key: 'ServerName', label: 'Server name', type: 'text', group: G.identity, help: 'Shown in the community server browser.' },
   { key: 'ServerDescription', label: 'Description', type: 'text', group: G.identity, help: 'One-liner under your name in the browser.' },
   { key: 'AdminPassword', label: 'Admin password', type: 'password', group: G.identity, help: 'Needed for admin commands, RCON, and the REST API.' },
@@ -102,3 +110,37 @@ export const FIELDS: ConfigField[] = [
   { key: 'bAllowGlobalPalboxImport', label: 'Global Palbox import', type: 'bool', group: G.world, help: 'Off keeps progression legit.' },
   { key: 'bIsUseBackupSaveData', label: 'Backup save data', type: 'bool', group: G.world },
 ]
+
+// Slider ranges (min/max/step) for rate-style fields — rendered as slider + input.
+const S5: SliderRange = { min: 0, max: 5, step: 0.1 }
+const SLIDERS: Record<string, SliderRange> = {
+  ExpRate: S5,
+  PalCaptureRate: S5,
+  PalSpawnNumRate: S5,
+  WorkSpeedRate: S5,
+  PalEggDefaultHatchingTime: S5,
+  DayTimeSpeedRate: S5,
+  NightTimeSpeedRate: S5,
+  EnemyDropItemRate: S5,
+  CollectionDropRate: S5,
+  CollectionObjectRespawnSpeedRate: S5,
+  ItemWeightRate: S5,
+  PalDamageRateAttack: S5,
+  PalDamageRateDefense: S5,
+  PlayerDamageRateAttack: S5,
+  PlayerDamageRateDefense: S5,
+  PlayerStomachDecreaceRate: S5,
+  PlayerStaminaDecreaceRate: S5,
+  PlayerAutoHPRegeneRate: S5,
+  PlayerAutoHpRegeneRateInSleep: S5,
+  PalStomachDecreaceRate: S5,
+  PalStaminaDecreaceRate: S5,
+  PalAutoHPRegeneRate: S5,
+  PalAutoHpRegeneRateInSleep: S5,
+  AutoResetGuildTimeNoOnlinePlayers: { min: 0, max: 720, step: 1 },
+  BuildObjectDeteriorationDamageRate: { min: 0, max: 10, step: 0.1 },
+}
+
+export const FIELDS: ConfigField[] = RAW_FIELDS.map((field) =>
+  SLIDERS[field.key] ? { ...field, slider: SLIDERS[field.key] } : field,
+)

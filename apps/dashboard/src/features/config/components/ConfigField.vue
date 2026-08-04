@@ -65,9 +65,25 @@ function togglePlatform(p: string): void {
       </button>
     </div>
 
-    <!-- number -->
+    <!-- number with slider -->
+    <div
+      v-if="(field.type === 'float' || field.type === 'int') && field.slider"
+      class="flex items-center gap-3"
+    >
+      <input
+        v-model="numDisplay"
+        type="range"
+        :min="field.slider.min"
+        :max="field.slider.max"
+        :step="field.slider.step"
+        class="h-2 flex-1 cursor-pointer accent-primary"
+      />
+      <Input v-model="numDisplay" type="number" class="w-20 shrink-0" />
+    </div>
+
+    <!-- plain number -->
     <Input
-      v-if="field.type === 'float' || field.type === 'int'"
+      v-else-if="field.type === 'float' || field.type === 'int'"
       v-model="numDisplay"
       type="number"
     />
