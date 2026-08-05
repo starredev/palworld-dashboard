@@ -22,6 +22,10 @@ services:
     volumes:
       - ${PALWORLD_DATA_DIR:-./palworld-data}:/palworld-data
       - /var/run/docker.sock:/var/run/docker.sock:ro
+    # The api runs as non-root, so add the host's `docker` group gid to let it
+    # read the socket. Find it with:  getent group docker  → set DOCKER_GID.
+    group_add:
+      - '${DOCKER_GID:-999}'
 
 networks:
   palworld:
