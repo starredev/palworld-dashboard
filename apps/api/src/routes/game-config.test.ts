@@ -42,7 +42,10 @@ describe('POST /api/server/config/apply', () => {
   })
 
   it('writes the ini and reports restarted:false when no server is running', async () => {
-    writeFileSync(iniPath, '[/Script/Pal.PalGameWorldSettings]\nOptionSettings=(ExpRate=1.000000)\n')
+    writeFileSync(
+      iniPath,
+      '[/Script/Pal.PalGameWorldSettings]\nOptionSettings=(ExpRate=1.000000)\n',
+    )
     const app = await buildApp()
     const token = await login(app)
     const res = await app.inject({

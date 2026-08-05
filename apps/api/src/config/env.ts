@@ -62,6 +62,10 @@ const envSchema = z.object({
   // ---- Logs viewer (optional) ----
   PALWORLD_LOG_PATH: z.string().default('/palworld-data/Pal/Saved/Logs/Pal.log'),
 
+  // ---- Scheduled ini-safe restart (configured from the panel, persisted here) ----
+  // Lives on the writable backups volume by default so it survives redeploys.
+  RESTART_SCHEDULE_PATH: z.string().default('/backups/tsuki-restart-schedule.json'),
+
   // ---- Guilds & Pals via the live-map's GameData API (optional) ----
   GAMEDATA_URL: emptyToUndefined(z.string().url().optional()),
   GAMEDATA_STATE_PATH: z.string().default('/api/state'),

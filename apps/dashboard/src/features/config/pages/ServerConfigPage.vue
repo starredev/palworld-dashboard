@@ -7,6 +7,7 @@ import { useConfigEditor } from '../use-config-editor'
 import ConfigField from '../components/ConfigField.vue'
 import ConfigOutput from '../components/ConfigOutput.vue'
 import ServerConfigActions from '../components/ServerConfigActions.vue'
+import RestartScheduleCard from '../components/RestartScheduleCard.vue'
 
 const { values, activePreset, applyPreset, importText, ini, body, changedCount } = useConfigEditor()
 
@@ -26,6 +27,8 @@ const grouped = computed(() =>
     </header>
 
     <ServerConfigActions :body="body" @load="importText" />
+
+    <RestartScheduleCard />
 
     <div class="flex flex-wrap gap-2">
       <Button

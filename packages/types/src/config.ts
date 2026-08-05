@@ -39,3 +39,28 @@ export const gameConfigApplyResultSchema = z.object({
   restarted: z.boolean(),
 })
 export type GameConfigApplyResult = z.infer<typeof gameConfigApplyResultSchema>
+
+/**
+ * A daily, ini-safe automatic restart configured from the panel. The restart
+ * uses a force-stop (never a graceful shutdown), so the server always reboots
+ * with the current PalWorldSettings.ini instead of reverting it.
+ */
+export const restartScheduleSchema = z.object({
+  enabled: z.boolean().default(false),
+  /** Daily restart time, "HH:MM" in the API container's local timezone. */
+  time: z
+    .string()
+    .regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'Use HH:MM (24-hour)')
+    .default('04:00'),
+  /** Warn players this many minutes before restarting (0 = no warning). */
+  warnMinutes: z.coerce.number().int().min(0).max(60).default(5),
+  /** Skip this occurrence if any players are online. */
+  skipIfPlayersOnline: z.boolean().default(false),
+})
+export type RestartSchedule = z.infer<typeof restartScheduleSchema>
+
+/** The schedule plus the next computed fire time (ISO), for display. */
+export const restartScheduleStateSchema = restartScheduleSchema.extend({
+  nextRun: z.string().nullable(),
+})
+export type RestartScheduleState = z.infer<typeof restartScheduleStateSchema>

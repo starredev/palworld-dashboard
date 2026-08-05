@@ -11,6 +11,7 @@ import {
   gameConfigSchema,
   gameConfigWriteResultSchema,
   gameConfigApplyResultSchema,
+  restartScheduleStateSchema,
   healthResponseSchema,
   palServerInfoSchema,
   palServerMetricsSchema,
@@ -24,6 +25,8 @@ import {
   type GameConfig,
   type GameConfigWriteResult,
   type GameConfigApplyResult,
+  type RestartSchedule,
+  type RestartScheduleState,
   type GuildsResponse,
   type HealthResponse,
   type LogsResponse,
@@ -68,6 +71,18 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ body }),
       schema: gameConfigApplyResultSchema,
+    })
+  },
+
+  getRestartSchedule(): Promise<RestartScheduleState> {
+    return apiFetch('/server/restart-schedule', { schema: restartScheduleStateSchema })
+  },
+
+  updateRestartSchedule(schedule: RestartSchedule): Promise<RestartScheduleState> {
+    return apiFetch('/server/restart-schedule', {
+      method: 'PUT',
+      body: JSON.stringify(schedule),
+      schema: restartScheduleStateSchema,
     })
   },
 

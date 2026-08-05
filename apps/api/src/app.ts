@@ -6,6 +6,7 @@ import { registerAuth } from './plugins/auth'
 import { registerPalworld } from './plugins/palworld'
 import { registerRealtime } from './plugins/realtime'
 import { registerBackupScheduler } from './plugins/backup-scheduler'
+import { registerRestartScheduler } from './plugins/restart-scheduler'
 import { healthRoutes } from './routes/health'
 import { configRoutes } from './routes/config'
 import { authRoutes } from './routes/auth'
@@ -13,6 +14,7 @@ import { serverRoutes } from './routes/server'
 import { playerRoutes } from './routes/players'
 import { commandRoutes } from './routes/commands'
 import { gameConfigRoutes } from './routes/game-config'
+import { restartScheduleRoutes } from './routes/restart-schedule'
 import { backupRoutes } from './routes/backups'
 import { gameDataRoutes } from './routes/gamedata'
 import { historyRoutes } from './routes/history'
@@ -45,6 +47,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await registerPalworld(app)
   await registerRealtime(app)
   await registerBackupScheduler(app)
+  await registerRestartScheduler(app)
 
   // All HTTP endpoints live under /api so a single reverse proxy can serve the
   // dashboard and forward /api to this service (same-origin, no browser CORS).
@@ -55,6 +58,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(playerRoutes, { prefix: '/api' })
   await app.register(commandRoutes, { prefix: '/api' })
   await app.register(gameConfigRoutes, { prefix: '/api' })
+  await app.register(restartScheduleRoutes, { prefix: '/api' })
   await app.register(backupRoutes, { prefix: '/api' })
   await app.register(gameDataRoutes, { prefix: '/api' })
   await app.register(historyRoutes, { prefix: '/api' })
