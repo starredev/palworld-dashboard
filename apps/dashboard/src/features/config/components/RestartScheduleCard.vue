@@ -2,7 +2,7 @@
 import { reactive, ref, watch } from 'vue'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
 import { CalendarClock, Loader2, Check } from 'lucide-vue-next'
-import { Card, CardHeader, CardTitle, CardContent, Button, Input, cn } from '@tsuki/ui'
+import { Card, CardHeader, CardTitle, CardContent, Button, Input, Switch } from '@tsuki/ui'
 import { api } from '@/lib/api'
 import type { RestartSchedule } from '@tsuki/types'
 
@@ -75,27 +75,7 @@ function formatNext(iso: string | null): string {
             Force-restarts the server so it reboots with the current config — never reverts it.
           </p>
         </div>
-        <button
-          type="button"
-          role="switch"
-          :aria-checked="form.enabled"
-          :class="
-            cn(
-              'relative h-6 w-11 shrink-0 rounded-full transition-colors',
-              form.enabled ? 'bg-primary' : 'bg-muted',
-            )
-          "
-          @click="form.enabled = !form.enabled"
-        >
-          <span
-            :class="
-              cn(
-                'absolute top-0.5 size-5 rounded-full bg-background transition-transform',
-                form.enabled ? 'translate-x-[22px]' : 'translate-x-0.5',
-              )
-            "
-          />
-        </button>
+        <Switch v-model="form.enabled" />
       </div>
 
       <div
@@ -114,27 +94,7 @@ function formatNext(iso: string | null): string {
         </div>
         <div class="flex items-center justify-between gap-3 sm:col-span-2">
           <label class="text-sm font-medium">Skip if players are online</label>
-          <button
-            type="button"
-            role="switch"
-            :aria-checked="form.skipIfPlayersOnline"
-            :class="
-              cn(
-                'relative h-6 w-11 shrink-0 rounded-full transition-colors',
-                form.skipIfPlayersOnline ? 'bg-primary' : 'bg-muted',
-              )
-            "
-            @click="form.skipIfPlayersOnline = !form.skipIfPlayersOnline"
-          >
-            <span
-              :class="
-                cn(
-                  'absolute top-0.5 size-5 rounded-full bg-background transition-transform',
-                  form.skipIfPlayersOnline ? 'translate-x-[22px]' : 'translate-x-0.5',
-                )
-              "
-            />
-          </button>
+          <Switch v-model="form.skipIfPlayersOnline" />
         </div>
       </div>
 

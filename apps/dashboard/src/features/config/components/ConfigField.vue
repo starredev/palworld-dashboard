@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import { Input, cn } from '@tsuki/ui'
+import { Input, Switch, cn } from '@tsuki/ui'
 import type { ConfigField } from '../fields'
 import { PLATFORM_OPTIONS } from '../fields'
 import { unquote, quote, parsePlatforms, serializePlatforms } from '../serialize'
@@ -41,28 +41,11 @@ function togglePlatform(p: string): void {
       <label class="text-sm font-medium">{{ field.label }}</label>
 
       <!-- bool toggle -->
-      <button
+      <Switch
         v-if="field.type === 'bool'"
-        type="button"
-        role="switch"
-        :aria-checked="on()"
-        :class="
-          cn(
-            'relative h-6 w-11 shrink-0 rounded-full transition-colors',
-            on() ? 'bg-primary' : 'bg-muted',
-          )
-        "
-        @click="raw = on() ? 'False' : 'True'"
-      >
-        <span
-          :class="
-            cn(
-              'absolute top-0.5 size-5 rounded-full bg-background transition-transform',
-              on() ? 'translate-x-[22px]' : 'translate-x-0.5',
-            )
-          "
-        />
-      </button>
+        :model-value="on()"
+        @update:model-value="(v) => (raw = v ? 'True' : 'False')"
+      />
     </div>
 
     <!-- number with slider -->
