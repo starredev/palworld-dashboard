@@ -26,6 +26,10 @@ const schedule = computed(() => query.data.value?.schedule ?? null)
 const restoreTarget = ref<BackupEntry | null>(null)
 const deleteTarget = ref<BackupEntry | null>(null)
 
+const actionError = computed(
+  () => create.error.value || restore.error.value || remove.error.value || null,
+)
+
 function date(iso: string): string {
   return new Date(iso).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })
 }
@@ -57,6 +61,14 @@ function confirmDelete(): void {
         Create backup
       </Button>
     </header>
+
+    <p
+      v-if="actionError"
+      class="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+    >
+      Backup action failed: {{ actionError.message }}. Check the API logs (a common cause is the
+      backups volume not being writable).
+    </p>
 
     <div v-if="query.isLoading.value" class="space-y-2">
       <Skeleton v-for="n in 3" :key="n" class="h-14 w-full" />

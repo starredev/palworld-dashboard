@@ -29,6 +29,10 @@ FROM node:22-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=build /app ./
+# Own the backups mount point as `node` so the named volume is seeded with
+# node:node ownership (Docker copies the image dir's perms into a fresh volume),
+# letting the non-root process write save backups.
+RUN mkdir -p /backups && chown node:node /backups
 EXPOSE 4000
 USER node
 CMD ["node", "dist/index.js"]
