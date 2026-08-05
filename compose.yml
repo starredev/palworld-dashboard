@@ -39,6 +39,8 @@ services:
       LIVEMAP_URL: ${LIVEMAP_URL:-}
       # Optional full Palworld map image for the built-in map background.
       MAP_IMAGE_URL: ${MAP_IMAGE_URL:-}
+      # Optional banner image across the top bar (a URL, or /brand/header.jpg).
+      HEADER_IMAGE_URL: ${HEADER_IMAGE_URL:-}
       # Guilds & Pals via the live-map's GameData API (internal URL + paths).
       GAMEDATA_URL: ${GAMEDATA_URL:-}
       GAMEDATA_STATE_PATH: ${GAMEDATA_STATE_PATH:-/api/state}

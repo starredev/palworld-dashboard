@@ -15,6 +15,7 @@ export async function configRoutes(app: FastifyInstance): Promise<void> {
       liveMapUrl: env.LIVEMAP_URL ?? null,
       mapImageUrl: env.MAP_IMAGE_URL ?? null,
       mapBounds,
+      headerImageUrl: env.HEADER_IMAGE_URL ?? null,
     }
   })
 }

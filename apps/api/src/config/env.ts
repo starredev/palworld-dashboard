@@ -69,6 +69,9 @@ const envSchema = z.object({
   LIVEMAP_URL: emptyToUndefined(z.string().url().optional()),
   // Optional full Palworld (Palpagos) map image for the built-in map background.
   MAP_IMAGE_URL: emptyToUndefined(z.string().url().optional()),
+  // Optional banner image shown across the dashboard top bar (any URL, or a
+  // path served by the dashboard like /brand/header.jpg).
+  HEADER_IMAGE_URL: emptyToUndefined(z.string().optional()),
   // World-coordinate bounds of that image as "xTopLeft,yTopLeft,xBottomRight,yBottomRight".
   // Default = the palworld-live-map palpagos.jpg bounds. Tweak to calibrate.
   MAP_BOUNDS: z.string().default('349400,724400,-1099400,-724400'),

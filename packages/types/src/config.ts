@@ -8,6 +8,8 @@ export const appConfigSchema = z.object({
   mapImageUrl: z.string().nullable(),
   /** World bounds of that image: [xTopLeft, yTopLeft, xBottomRight, yBottomRight]. */
   mapBounds: z.tuple([z.number(), z.number(), z.number(), z.number()]),
+  /** Optional banner image shown across the top bar to brand the panel. */
+  headerImageUrl: z.string().nullable(),
 })
 
 export type AppConfig = z.infer<typeof appConfigSchema>
