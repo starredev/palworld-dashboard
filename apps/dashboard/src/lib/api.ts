@@ -12,6 +12,9 @@ import {
   gameConfigWriteResultSchema,
   gameConfigApplyResultSchema,
   restartScheduleStateSchema,
+  configProfileSchema,
+  configProfilesStateSchema,
+  configEventSchema,
   healthResponseSchema,
   palServerInfoSchema,
   palServerMetricsSchema,
@@ -27,6 +30,11 @@ import {
   type GameConfigApplyResult,
   type RestartSchedule,
   type RestartScheduleState,
+  type ConfigProfile,
+  type ConfigProfileInput,
+  type ConfigProfilesState,
+  type ConfigEvent,
+  type ConfigEventInput,
   type GuildsResponse,
   type HealthResponse,
   type LogsResponse,
@@ -84,6 +92,41 @@ export const api = {
       body: JSON.stringify(schedule),
       schema: restartScheduleStateSchema,
     })
+  },
+
+  getConfigProfiles(): Promise<ConfigProfilesState> {
+    return apiFetch('/server/config/profiles', { schema: configProfilesStateSchema })
+  },
+
+  saveConfigProfile(input: ConfigProfileInput): Promise<ConfigProfile> {
+    return apiFetch('/server/config/profiles', {
+      method: 'POST',
+      body: JSON.stringify(input),
+      schema: configProfileSchema,
+    })
+  },
+
+  deleteConfigProfile(id: string): Promise<unknown> {
+    return apiFetch(`/server/config/profiles/${encodeURIComponent(id)}`, { method: 'DELETE' })
+  },
+
+  applyConfigProfile(id: string): Promise<GameConfigApplyResult> {
+    return apiFetch(`/server/config/profiles/${encodeURIComponent(id)}/apply`, {
+      method: 'POST',
+      schema: gameConfigApplyResultSchema,
+    })
+  },
+
+  createConfigEvent(input: ConfigEventInput): Promise<ConfigEvent> {
+    return apiFetch('/server/config/events', {
+      method: 'POST',
+      body: JSON.stringify(input),
+      schema: configEventSchema,
+    })
+  },
+
+  deleteConfigEvent(id: string): Promise<unknown> {
+    return apiFetch(`/server/config/events/${encodeURIComponent(id)}`, { method: 'DELETE' })
   },
 
   login(password: string): Promise<SessionResponse> {

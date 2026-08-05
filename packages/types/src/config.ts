@@ -64,3 +64,57 @@ export const restartScheduleStateSchema = restartScheduleSchema.extend({
   nextRun: z.string().nullable(),
 })
 export type RestartScheduleState = z.infer<typeof restartScheduleStateSchema>
+
+// ---- Config profiles & scheduled events (e.g. a "Double EXP weekend") ----
+
+/** A named snapshot of the OptionSettings body, applied with one click. */
+export const configProfileSchema = z.object({
+  id: z.string(),
+  name: z.string().min(1).max(60),
+  /** The OptionSettings body (contents inside the outer parentheses). */
+  body: z.string().min(1),
+  /** Optional broadcast sent when this profile is applied. */
+  announce: z.string().max(500).default(''),
+})
+export type ConfigProfile = z.infer<typeof configProfileSchema>
+
+/** Create/replace payload — no id (assigned server-side, replaced by name). */
+export const configProfileInputSchema = configProfileSchema.omit({ id: true })
+export type ConfigProfileInput = z.infer<typeof configProfileInputSchema>
+
+/**
+ * A scheduled event: activate `profileId` at `startsAt`, then revert to
+ * `revertProfileId` at `endsAt`. Both transitions force-restart + announce.
+ */
+export const configEventSchema = z.object({
+  id: z.string(),
+  name: z.string().min(1).max(60),
+  profileId: z.string(),
+  revertProfileId: z.string(),
+  startsAt: z.string().datetime(),
+  endsAt: z.string().datetime(),
+  activated: z.boolean().default(false),
+  reverted: z.boolean().default(false),
+})
+export type ConfigEvent = z.infer<typeof configEventSchema>
+
+export const configEventInputSchema = configEventSchema.pick({
+  name: true,
+  profileId: true,
+  revertProfileId: true,
+  startsAt: true,
+  endsAt: true,
+})
+export type ConfigEventInput = z.infer<typeof configEventInputSchema>
+
+/** Event with a derived lifecycle status, for display. */
+export const configEventViewSchema = configEventSchema.extend({
+  status: z.enum(['upcoming', 'active', 'done']),
+})
+export type ConfigEventView = z.infer<typeof configEventViewSchema>
+
+export const configProfilesStateSchema = z.object({
+  profiles: z.array(configProfileSchema),
+  events: z.array(configEventViewSchema),
+})
+export type ConfigProfilesState = z.infer<typeof configProfilesStateSchema>

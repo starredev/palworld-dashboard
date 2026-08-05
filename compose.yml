@@ -9,6 +9,9 @@ services:
       NODE_ENV: production
       API_HOST: 0.0.0.0
       API_PORT: 4000
+      # Timezone for scheduled restarts & config events (their times are local to
+      # this container). Defaults to UTC — set TZ in your .env, e.g. Europe/Amsterdam.
+      TZ: ${TZ:-UTC}
       AUTH_PASSWORD: ${AUTH_PASSWORD:?set AUTH_PASSWORD in your .env}
       JWT_SECRET: ${JWT_SECRET:?set a strong JWT_SECRET (min 16 chars) in your .env}
       SESSION_TTL: ${SESSION_TTL:-7d}

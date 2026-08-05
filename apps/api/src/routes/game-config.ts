@@ -1,8 +1,8 @@
 import type { FastifyInstance } from 'fastify'
-import { PalworldNotConfiguredError } from '@tsuki/sdk'
 import { gameConfigUpdateSchema, type GameConfig } from '@tsuki/types'
 import { authenticate } from '../plugins/auth'
 import { isConfigAvailable, readConfigFile, writeConfigFile } from '../services/game-config'
+import { applyIniAndRestart } from '../services/config-apply'
 
 /** Read/write the server's real PalWorldSettings.ini (when a volume is mounted). */
 export async function gameConfigRoutes(app: FastifyInstance): Promise<void> {
@@ -41,33 +41,16 @@ export async function gameConfigRoutes(app: FastifyInstance): Promise<void> {
     const parsed = gameConfigUpdateSchema.safeParse(req.body)
     if (!parsed.success) return reply.status(400).send({ message: 'A config body is required' })
 
-    // Best-effort: warn players and persist the world before we cut it down.
     try {
-      await app.palworld.announce('Server restarting to apply new settings…')
-      await app.palworld.save()
-    } catch (error) {
-      reply.log.warn({ err: error }, 'pre-restart announce/save failed (continuing)')
-    }
-
-    let path: string
-    try {
-      path = writeConfigFile(parsed.data.body)
+      const { path, restarted } = await applyIniAndRestart(
+        app,
+        parsed.data.body,
+        'Server restarting to apply new settings…',
+      )
+      return { ok: true, path, restarted }
     } catch (error) {
       reply.log.error(error)
       return reply.status(500).send({ message: 'Failed to write config' })
     }
-
-    // Force-stop last, after the file is on disk. NOT a graceful shutdown.
-    try {
-      await app.palworld.stop()
-    } catch (error) {
-      // No server configured at all — the file is written and applies on next boot.
-      if (error instanceof PalworldNotConfiguredError) {
-        return { ok: true, path, restarted: false }
-      }
-      // The REST/RCON connection commonly drops as the process dies — that's success.
-      reply.log.warn({ err: error }, 'force-stop errored (server likely shutting down)')
-    }
-    return { ok: true, path, restarted: true }
   })
 }

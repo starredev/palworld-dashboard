@@ -66,6 +66,9 @@ const envSchema = z.object({
   // Lives on the writable backups volume by default so it survives redeploys.
   RESTART_SCHEDULE_PATH: z.string().default('/backups/tsuki-restart-schedule.json'),
 
+  // ---- Config profiles & scheduled events (persisted on the backups volume) ----
+  CONFIG_PROFILES_PATH: z.string().default('/backups/tsuki-config-profiles.json'),
+
   // ---- Guilds & Pals via the live-map's GameData API (optional) ----
   GAMEDATA_URL: emptyToUndefined(z.string().url().optional()),
   GAMEDATA_STATE_PATH: z.string().default('/api/state'),
