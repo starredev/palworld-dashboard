@@ -2,7 +2,7 @@
 import { computed, nextTick, ref, watch } from 'vue'
 import { ScrollText, Search, Pause, Play } from 'lucide-vue-next'
 import { useQuery } from '@tanstack/vue-query'
-import { Card, Input, Button } from '@tsuki/ui'
+import { Input, Button, cn } from '@tsuki/ui'
 import { api } from '@/lib/api'
 import PagePlaceholder from '@/components/common/PagePlaceholder.vue'
 
@@ -22,9 +22,16 @@ const lines = computed(() => {
 })
 
 function tone(line: string): string {
-  if (/error|fatal|exception/i.test(line)) return 'text-red-400'
+  if (/error|fatal|exception|failed/i.test(line)) return 'text-red-400'
   if (/warn/i.test(line)) return 'text-amber-400'
-  return 'text-muted-foreground'
+  if (/success|started|online|joined/i.test(line)) return 'text-emerald-400'
+  return 'text-zinc-400'
+}
+
+// Split a leading "[timestamp]" so it can be dimmed like a real console.
+function parts(line: string): { ts: string; rest: string } {
+  const m = line.match(/^(\[[^\]]+\]\s*)([\s\S]*)$/)
+  return m ? { ts: m[1], rest: m[2] } : { ts: '', rest: line }
 }
 
 const scroller = ref<HTMLElement>()
@@ -42,7 +49,7 @@ watch(lines, async () => {
     <header class="flex flex-wrap items-end justify-between gap-3">
       <div class="space-y-1">
         <h2 class="text-xl font-semibold tracking-tight">Logs</h2>
-        <p class="text-sm text-muted-foreground">Live tail of your Palworld server log.</p>
+        <p class="text-sm text-muted-foreground">Live tail of your Palworld server.</p>
       </div>
       <div class="flex flex-wrap items-center gap-2">
         <div class="relative">
@@ -66,22 +73,64 @@ watch(lines, async () => {
       description="Point the panel at your server's logs: set PALWORLD_CONTAINER (to read docker logs) or mount the data dir with a Pal.log file at PALWORLD_LOG_PATH."
     />
 
-    <Card v-else class="overflow-hidden">
-      <div ref="scroller" class="max-h-[65vh] overflow-auto p-4 font-mono text-xs leading-relaxed">
-        <p v-if="lines.length === 0" class="text-muted-foreground">No log lines.</p>
-        <div
-          v-for="(line, i) in lines"
-          :key="i"
-          :class="['whitespace-pre-wrap break-all', tone(line)]"
-        >
-          {{ line }}
+    <div v-else class="overflow-hidden rounded-xl border border-white/10 bg-[#0a0c11] shadow-2xl">
+      <!-- Title bar -->
+      <div class="flex items-center gap-2 border-b border-white/10 bg-white/[0.03] px-4 py-2.5">
+        <span class="size-3 rounded-full bg-[#ff5f56]" />
+        <span class="size-3 rounded-full bg-[#ffbd2e]" />
+        <span class="size-3 rounded-full bg-[#27c93f]" />
+        <span class="ml-2 font-mono text-xs text-white/50">palworld-server — tail -f</span>
+        <div class="ml-auto flex items-center gap-3">
+          <label class="flex cursor-pointer items-center gap-1.5 text-xs text-white/40">
+            <input v-model="autoScroll" type="checkbox" class="accent-emerald-500" />
+            auto-scroll
+          </label>
+          <span class="font-mono text-xs text-white/40">{{ lines.length }} lines</span>
+          <span class="flex items-center gap-1.5">
+            <span
+              :class="
+                cn('size-2 rounded-full', live ? 'animate-pulse bg-emerald-400' : 'bg-zinc-500')
+              "
+            />
+            <span class="font-mono text-xs text-white/50">{{ live ? 'streaming' : 'paused' }}</span>
+          </span>
         </div>
       </div>
-    </Card>
 
-    <label class="flex items-center gap-2 text-xs text-muted-foreground">
-      <input v-model="autoScroll" type="checkbox" class="accent-primary" />
-      Auto-scroll to newest
-    </label>
+      <!-- Terminal body -->
+      <div
+        ref="scroller"
+        class="max-h-[65vh] overflow-auto bg-[#0a0c11] px-4 py-3 font-mono text-[12.5px] leading-relaxed"
+      >
+        <p v-if="lines.length === 0" class="text-zinc-500">
+          <span class="text-emerald-400">$</span> waiting for output…
+        </p>
+        <template v-else>
+          <div
+            v-for="(line, i) in lines"
+            :key="i"
+            class="group flex gap-3 whitespace-pre-wrap break-all rounded px-1 hover:bg-white/[0.04]"
+          >
+            <span
+              class="select-none text-right text-zinc-700 tabular-nums"
+              style="min-width: 2.5rem"
+            >
+              {{ i + 1 }}
+            </span>
+            <span :class="tone(line)">
+              <span v-if="parts(line).ts" class="text-zinc-600">{{ parts(line).ts }}</span
+              >{{ parts(line).rest }}
+            </span>
+          </div>
+          <div class="flex gap-3 px-1">
+            <span class="select-none text-right text-zinc-700" style="min-width: 2.5rem" />
+            <span class="text-emerald-400"
+              >$<span
+                class="ml-1 inline-block h-3.5 w-2 animate-pulse bg-emerald-400/80 align-middle"
+            /></span>
+          </div>
+        </template>
+      </div>
+    </div>
   </section>
 </template>
