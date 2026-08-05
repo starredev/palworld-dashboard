@@ -5,13 +5,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 const { files, execFileImpl } = vi.hoisted(() => {
   // In-memory filesystem: the set of paths that "exist".
   const files = new Set<string>()
-  // Mock convert.py: derives the output path from the input's extension and
-  // "creates" it, exactly as the real tool does, then invokes the callback so
-  // promisify(execFile) resolves.
+  // Mock the converter: "creates" the file passed after `-o`, then invokes the
+  // callback so promisify(execFile) resolves.
   const execFileImpl = vi.fn(
     (_cmd: string, args: string[], _opts: unknown, cb: (e: unknown, r: unknown) => void) => {
-      const input = args[1]
-      const out = input.endsWith('.json') ? input.slice(0, -5) : `${input}.json`
+      const out = args[args.indexOf('-o') + 1]
       files.add(out)
       cb(null, { stdout: '', stderr: '' })
     },
@@ -27,7 +25,7 @@ vi.mock('node:fs', () => ({
 vi.mock('node:fs/promises', () => ({ readFile: vi.fn(async () => '{"ok":true}') }))
 
 const SAVE_DIR = '/palworld-data/Pal/Saved/SaveGames'
-const CONVERT = join('/opt/palworld-save-tools', 'convert.py')
+const CONVERT = join('/opt/palworld-save-tools', 'palworld_save_tools', 'commands', 'convert.py')
 
 import { isSaveEditorAvailable, jsonToSav, readSaveJson, savToJson } from './save-editor'
 
@@ -54,14 +52,22 @@ describe('isSaveEditorAvailable', () => {
 })
 
 describe('savToJson', () => {
-  it('converts a .sav to <path>.json via python + convert.py', async () => {
+  it('converts a .sav to <path>.json via the converter module', async () => {
     files.add(`${SAVE_DIR}/Level.sav`)
     const out = await savToJson(`${SAVE_DIR}/Level.sav`)
     expect(out).toBe(`${SAVE_DIR}/Level.sav.json`)
     expect(execFileImpl).toHaveBeenCalledWith(
       'python3',
-      [CONVERT, `${SAVE_DIR}/Level.sav`],
-      expect.any(Object),
+      [
+        '-m',
+        'palworld_save_tools.commands.convert',
+        `${SAVE_DIR}/Level.sav`,
+        '--to-json',
+        '-o',
+        `${SAVE_DIR}/Level.sav.json`,
+        '--force',
+      ],
+      expect.objectContaining({ cwd: '/opt/palworld-save-tools' }),
       expect.any(Function),
     )
   })
