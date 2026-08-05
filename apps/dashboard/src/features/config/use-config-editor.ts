@@ -2,6 +2,21 @@ import { computed, ref } from 'vue'
 import { DEFAULT_OPTION_SETTINGS } from './default-ini'
 import { parseBody, parseConfig, toBody, toIni } from './serialize'
 import { PRESETS } from './presets'
+import { FIELDS } from './fields'
+
+// Palworld expects floats as X.000000 and ints as plain integers.
+const FIELD_TYPE = new Map(FIELDS.map((f) => [f.key, f.type]))
+function formatForIni(values: Record<string, string>): Record<string, string> {
+  const out: Record<string, string> = { ...values }
+  for (const [key, raw] of Object.entries(out)) {
+    const type = FIELD_TYPE.get(key)
+    const n = Number(raw)
+    if (raw === '' || !Number.isFinite(n)) continue
+    if (type === 'float') out[key] = n.toFixed(6)
+    else if (type === 'int') out[key] = String(Math.round(n))
+  }
+  return out
+}
 
 /** Reactive state for the config editor: a raw key→value map + original order. */
 export function useConfigEditor() {
@@ -34,8 +49,9 @@ export function useConfigEditor() {
     activePreset.value = ''
   }
 
-  const ini = computed(() => toIni({ order: order.value, values: values.value }))
-  const body = computed(() => toBody({ order: order.value, values: values.value }))
+  const formatted = computed(() => formatForIni(values.value))
+  const ini = computed(() => toIni({ order: order.value, values: formatted.value }))
+  const body = computed(() => toBody({ order: order.value, values: formatted.value }))
   const changedCount = computed(
     () => order.value.filter((k) => values.value[k] !== base.values[k]).length,
   )

@@ -70,6 +70,13 @@ function confirmRestart(): void {
           Restart
         </Button>
       </div>
+      <p
+        v-if="save.error.value"
+        class="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+      >
+        Save failed: {{ save.error.value.message }}. The API may not have write access to
+        PalWorldSettings.ini — check the api logs.
+      </p>
       <p class="flex items-start gap-2 text-xs text-muted-foreground/80">
         <TriangleAlert class="mt-0.5 size-3.5 shrink-0" />
         <span>
