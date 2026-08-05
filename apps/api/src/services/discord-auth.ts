@@ -23,7 +23,8 @@ export function buildAuthorizeUrl(state: string): string {
     client_id: env.DISCORD_CLIENT_ID ?? '',
     redirect_uri: env.DISCORD_REDIRECT_URI ?? '',
     response_type: 'code',
-    scope: 'identify guilds',
+    // guilds.members.read lets us read the user's roles in the configured guild.
+    scope: 'identify guilds guilds.members.read',
     state,
     prompt: 'none',
   })
@@ -69,28 +70,49 @@ export function fetchDiscordUser(accessToken: string): Promise<DiscordUser> {
   return getJson<DiscordUser>('/users/@me', accessToken)
 }
 
-export function fetchDiscordGuildIds(accessToken: string): Promise<string[]> {
-  return getJson<{ id: string }[]>('/users/@me/guilds', accessToken).then((gs) =>
-    gs.map((g) => g.id),
-  )
+export interface GuildMembership {
+  isMember: boolean
+  roles: string[]
+}
+
+/** The user's membership + role ids in a specific guild (via guilds.members.read). */
+export async function fetchGuildMembership(
+  accessToken: string,
+  guildId: string,
+): Promise<GuildMembership> {
+  const res = await fetch(`${DISCORD_API}/users/@me/guilds/${guildId}/member`, {
+    headers: { authorization: `Bearer ${accessToken}` },
+  })
+  // Not a member of that guild.
+  if (res.status === 404 || res.status === 403) return { isMember: false, roles: [] }
+  if (!res.ok) throw new Error(`Discord guild member lookup failed (${res.status})`)
+  const json = (await res.json()) as { roles?: string[] }
+  return { isMember: true, roles: json.roles ?? [] }
 }
 
 /**
- * Decide whether a Discord user may sign in and with what role. Fails closed:
- * if neither a guild nor an allowlist is configured, nobody is allowed.
+ * Decide whether a Discord user may sign in and with what role — driven by their
+ * Discord roles (ranks) in the guild, with optional user-id lists as extras.
+ * Fails closed: with no guild and no id allowlist configured, nobody is allowed.
  */
 export function authorizeDiscordUser(
   user: DiscordUser,
-  guildIds: string[],
+  membership: GuildMembership,
 ): { allowed: boolean; role: SessionUser['role'] } {
   const env = loadEnv()
   const gate = Boolean(env.DISCORD_GUILD_ID) || env.DISCORD_ALLOWED_IDS.length > 0
   if (!gate) return { allowed: false, role: 'viewer' }
 
-  const byGuild = env.DISCORD_GUILD_ID ? guildIds.includes(env.DISCORD_GUILD_ID) : false
-  const byList = env.DISCORD_ALLOWED_IDS.includes(user.id)
-  const allowed = byGuild || byList
-  const role: SessionUser['role'] = env.DISCORD_ADMIN_IDS.includes(user.id) ? 'admin' : 'viewer'
+  const roles = membership.roles
+  const isAdmin =
+    env.DISCORD_ADMIN_IDS.includes(user.id) ||
+    env.DISCORD_ADMIN_ROLE_IDS.some((r) => roles.includes(r))
+  const role: SessionUser['role'] = isAdmin ? 'admin' : 'viewer'
+
+  const roleFilter = env.DISCORD_ALLOWED_ROLE_IDS
+  const memberAllowed =
+    membership.isMember && (roleFilter.length === 0 || roles.some((r) => roleFilter.includes(r)))
+  const allowed = env.DISCORD_ALLOWED_IDS.includes(user.id) || memberAllowed
   return { allowed, role }
 }
 

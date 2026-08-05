@@ -13,8 +13,8 @@ import {
   buildAuthorizeUrl,
   discordEnabled,
   exchangeCode,
-  fetchDiscordGuildIds,
   fetchDiscordUser,
+  fetchGuildMembership,
   toSessionUser,
 } from '../services/discord-auth'
 
@@ -89,8 +89,10 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
     try {
       const accessToken = await exchangeCode(code)
       const user = await fetchDiscordUser(accessToken)
-      const guildIds = env.DISCORD_GUILD_ID ? await fetchDiscordGuildIds(accessToken) : []
-      const { allowed, role } = authorizeDiscordUser(user, guildIds)
+      const membership = env.DISCORD_GUILD_ID
+        ? await fetchGuildMembership(accessToken, env.DISCORD_GUILD_ID)
+        : { isMember: false, roles: [] }
+      const { allowed, role } = authorizeDiscordUser(user, membership)
       if (!allowed) return reply.redirect('/login?error=forbidden')
 
       await issueSession(reply, toSessionUser(user, role))

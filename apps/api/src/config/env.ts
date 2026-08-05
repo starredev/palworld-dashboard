@@ -48,6 +48,27 @@ const envSchema = z.object({
         .map((s) => s.trim())
         .filter(Boolean),
     ),
+  // Discord ROLE ids (ranks) — preferred over user ids. Requires DISCORD_GUILD_ID.
+  // Having an admin role → admin. If allowed-role ids are set, only members with
+  // one of those roles may sign in (otherwise any guild member may, as viewer).
+  DISCORD_ADMIN_ROLE_IDS: z
+    .string()
+    .default('')
+    .transform((v) =>
+      v
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean),
+    ),
+  DISCORD_ALLOWED_ROLE_IDS: z
+    .string()
+    .default('')
+    .transform((v) =>
+      v
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean),
+    ),
   // Force the session cookie's `Secure` flag. Defaults to on in production.
   // Set to `false` when serving the compose demo over plain http://localhost.
   COOKIE_SECURE: z
