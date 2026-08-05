@@ -14,7 +14,12 @@ defineProps<{
   sortKey?: SortKey
   sortDir?: 'asc' | 'desc'
 }>()
-defineEmits<{ kick: [player: PalPlayer]; ban: [player: PalPlayer]; sort: [key: SortKey] }>()
+defineEmits<{
+  kick: [player: PalPlayer]
+  ban: [player: PalPlayer]
+  sort: [key: SortKey]
+  select: [player: PalPlayer]
+}>()
 
 const COLUMNS: { key: SortKey; label: string }[] = [
   { key: 'name', label: 'Name' },
@@ -53,7 +58,14 @@ function dash(value: string | number | null | undefined): string {
             :key="player.userId ?? player.playerId ?? `${player.name}-${i}`"
             class="border-b border-border/60 transition-colors last:border-0 hover:bg-accent/40"
           >
-            <td class="px-5 py-3 font-medium">{{ dash(player.name) }}</td>
+            <td class="px-5 py-3">
+              <button
+                class="font-medium underline-offset-4 hover:text-primary hover:underline"
+                @click="$emit('select', player)"
+              >
+                {{ dash(player.name) }}
+              </button>
+            </td>
             <td class="px-5 py-3 text-muted-foreground">{{ dash(player.level) }}</td>
             <td class="px-5 py-3 text-muted-foreground">
               {{ player.ping != null ? `${Math.round(player.ping)} ms` : '—' }}

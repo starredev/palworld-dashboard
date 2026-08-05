@@ -44,6 +44,25 @@ export const palsResponseSchema = z.object({
 })
 export type PalsResponse = z.infer<typeof palsResponseSchema>
 
+/** A player from the save-data roster — includes offline players + last seen. */
+export const rosterPlayerSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  level: z.number().int().nonnegative().nullable(),
+  online: z.boolean(),
+  lastSeenAt: z.string().nullable(),
+  guildName: z.string().nullable(),
+  captureTotal: z.number().int().nonnegative().nullable(),
+  paldeckUnlocked: z.number().int().nonnegative().nullable(),
+})
+export type RosterPlayer = z.infer<typeof rosterPlayerSchema>
+
+export const playersRosterResponseSchema = z.object({
+  available: z.boolean(),
+  players: z.array(rosterPlayerSchema),
+})
+export type PlayersRosterResponse = z.infer<typeof playersRosterResponseSchema>
+
 /** A positioned entity for the built-in coordinate map. */
 export const mapPointKindSchema = z.enum(['player', 'base', 'pal', 'wild', 'npc', 'boss', 'alpha'])
 export type MapPointKind = z.infer<typeof mapPointKindSchema>

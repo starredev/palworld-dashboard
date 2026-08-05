@@ -1,4 +1,4 @@
-import type { Guild, GuildMember, MapPoint, MapPointKind, Pal } from '@tsuki/types'
+import type { Guild, GuildMember, MapPoint, MapPointKind, Pal, RosterPlayer } from '@tsuki/types'
 import { loadEnv } from '../config/env'
 
 export interface RawPlayer {
@@ -63,6 +63,23 @@ async function fetchRaw(): Promise<{ players: RawPlayer[]; objects: RawObject[] 
 export async function getGameData(): Promise<{ guilds: Guild[]; pals: Pal[] }> {
   const { players, objects } = await fetchRaw()
   return deriveGameData(players, objects)
+}
+
+/** Fetch the full player roster (online + offline, with last-seen + guild). */
+export async function getPlayerRoster(): Promise<RosterPlayer[]> {
+  const { players } = await fetchRaw()
+  return players
+    .map((p) => ({
+      id: p.id,
+      name: p.name,
+      level: p.level ?? null,
+      online: Boolean(p.online),
+      lastSeenAt: p.lastSeenAt ?? null,
+      guildName: p.guildName ?? null,
+      captureTotal: p.captureTotal ?? null,
+      paldeckUnlocked: p.paldeckUnlocked ?? null,
+    }))
+    .sort((a, b) => Number(b.online) - Number(a.online) || a.name.localeCompare(b.name))
 }
 
 /** Fetch positioned entities for the built-in coordinate map. */

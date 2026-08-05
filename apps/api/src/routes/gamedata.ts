@@ -1,7 +1,12 @@
 import type { FastifyInstance } from 'fastify'
-import type { GuildsResponse, MapResponse, PalsResponse } from '@tsuki/types'
+import type { GuildsResponse, MapResponse, PalsResponse, PlayersRosterResponse } from '@tsuki/types'
 import { authenticate } from '../plugins/auth'
-import { getGameData, getMapPoints, isGameDataConfigured } from '../services/gamedata'
+import {
+  getGameData,
+  getMapPoints,
+  getPlayerRoster,
+  isGameDataConfigured,
+} from '../services/gamedata'
 
 /** Guilds & Pals derived from the live-map GameData API. */
 export async function gameDataRoutes(app: FastifyInstance): Promise<void> {
@@ -26,6 +31,20 @@ export async function gameDataRoutes(app: FastifyInstance): Promise<void> {
       return { available: false, pals: [] }
     }
   })
+
+  app.get(
+    '/players/roster',
+    { preHandler: authenticate },
+    async (): Promise<PlayersRosterResponse> => {
+      if (!isGameDataConfigured()) return { available: false, players: [] }
+      try {
+        return { available: true, players: await getPlayerRoster() }
+      } catch (error) {
+        app.log.warn({ error }, 'gamedata fetch failed')
+        return { available: false, players: [] }
+      }
+    },
+  )
 
   app.get('/map', { preHandler: authenticate }, async (): Promise<MapResponse> => {
     if (!isGameDataConfigured()) return { available: false, points: [] }

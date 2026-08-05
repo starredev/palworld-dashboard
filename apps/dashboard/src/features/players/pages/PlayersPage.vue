@@ -1,13 +1,17 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useQuery } from '@tanstack/vue-query'
 import { Users, PlugZap, ServerOff, Search } from 'lucide-vue-next'
 import type { PalPlayer } from '@tsuki/types'
 import { Skeleton, ConfirmDialog, Input } from '@tsuki/ui'
+import { api } from '@/lib/api'
 import { useServerStatus } from '@/composables/use-server'
 import { usePlayers } from '@/composables/use-players'
 import { useServerCommands } from '@/composables/use-commands'
 import PagePlaceholder from '@/components/common/PagePlaceholder.vue'
 import PlayerTable, { type SortKey } from '../components/PlayerTable.vue'
+import OfflinePlayersTable from '../components/OfflinePlayersTable.vue'
+import PlayerDetailDialog from '../components/PlayerDetailDialog.vue'
 
 const status = useServerStatus()
 const statusData = computed(() => status.data.value)
@@ -53,6 +57,16 @@ const displayed = computed(() => {
   return sortDir.value === 'desc' ? sorted.reverse() : sorted
 })
 
+// Full roster (incl. offline players + last seen) from the live-map GameData.
+const roster = useQuery({
+  queryKey: ['playersRoster'],
+  queryFn: () => api.getPlayerRoster(),
+  refetchInterval: 15_000,
+})
+const offlinePlayers = computed(() => (roster.data.value?.players ?? []).filter((p) => !p.online))
+
+const selected = ref<PalPlayer | null>(null)
+
 const { kick, ban } = useServerCommands()
 const actingId = ref<string | null>(null)
 const banTarget = ref<PalPlayer | null>(null)
@@ -82,7 +96,8 @@ function confirmBan(): void {
       <div class="space-y-1">
         <h2 class="text-xl font-semibold tracking-tight">Players</h2>
         <p class="text-sm text-muted-foreground">
-          {{ reachable ? `${list.length} online` : 'Online players on your server' }}
+          {{ reachable ? `${list.length} online` : 'Online players on your server'
+          }}{{ offlinePlayers.length ? ` · ${offlinePlayers.length} offline` : '' }}
         </p>
       </div>
       <div v-if="reachable && list.length" class="relative">
@@ -129,6 +144,22 @@ function confirmBan(): void {
       @kick="onKick"
       @ban="(p) => (banTarget = p)"
       @sort="onSort"
+      @select="(p) => (selected = p)"
+    />
+
+    <div v-if="offlinePlayers.length" class="space-y-3">
+      <h3 class="text-sm font-medium text-muted-foreground">
+        Offline · {{ offlinePlayers.length }}
+      </h3>
+      <OfflinePlayersTable :players="offlinePlayers" />
+    </div>
+
+    <PlayerDetailDialog
+      :player="selected"
+      :busy="actingId !== null"
+      @close="selected = null"
+      @kick="(p) => ((selected = null), onKick(p))"
+      @ban="(p) => ((selected = null), (banTarget = p))"
     />
 
     <ConfirmDialog

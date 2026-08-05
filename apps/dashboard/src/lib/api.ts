@@ -5,6 +5,7 @@ import {
   commandResultSchema,
   guildsResponseSchema,
   palsResponseSchema,
+  playersRosterResponseSchema,
   mapResponseSchema,
   metricsHistoryResponseSchema,
   logsResponseSchema,
@@ -43,6 +44,7 @@ import {
   type MapResponse,
   type MetricsHistoryResponse,
   type PalsResponse,
+  type PlayersRosterResponse,
   type PalServerInfo,
   type PalServerMetrics,
   type PalStatus,
@@ -172,6 +174,10 @@ export const api = {
 
   getPlayers(): Promise<PlayersResponse> {
     return apiFetch('/players', { schema: playersResponseSchema })
+  },
+
+  getPlayerRoster(): Promise<PlayersRosterResponse> {
+    return apiFetch('/players/roster', { schema: playersRosterResponseSchema })
   },
 
   broadcast(message: string): Promise<CommandResult> {
