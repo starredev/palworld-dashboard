@@ -8,9 +8,7 @@ import { useConfigEditor } from '../use-config-editor'
 import ConfigField from '../components/ConfigField.vue'
 import ConfigOutput from '../components/ConfigOutput.vue'
 import ServerConfigActions from '../components/ServerConfigActions.vue'
-import RestartScheduleCard from '../components/RestartScheduleCard.vue'
 import ConfigProfilesCard from '../components/ConfigProfilesCard.vue'
-import ConfigEventsCard from '../components/ConfigEventsCard.vue'
 
 const auth = useAuthStore()
 const { values, activePreset, applyPreset, importText, ini, body, changedCount } = useConfigEditor()
@@ -32,13 +30,7 @@ const grouped = computed(() =>
 
     <template v-if="auth.isAdmin">
       <ServerConfigActions :body="body" @load="importText" />
-
-      <div class="grid gap-6 lg:grid-cols-2">
-        <ConfigProfilesCard :body="body" />
-        <ConfigEventsCard />
-      </div>
-
-      <RestartScheduleCard />
+      <ConfigProfilesCard :body="body" />
     </template>
     <p
       v-else

@@ -62,6 +62,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: 'Server config' },
       },
       {
+        path: 'schedules',
+        name: 'schedules',
+        component: () => import('@/features/schedules/pages/SchedulesPage.vue'),
+        meta: { title: 'Schedules' },
+      },
+      {
         path: 'backups',
         name: 'backups',
         component: () => import('@/features/backups/pages/BackupsPage.vue'),
