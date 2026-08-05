@@ -1,13 +1,18 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { RouterLink } from 'vue-router'
-import { X, UserX, Ban, Copy, Check, MapPin } from 'lucide-vue-next'
+import { X, UserX, Ban, Copy, Check, MapPin, Navigation } from 'lucide-vue-next'
 import { Button } from '@tsuki/ui'
 import type { PalPlayer } from '@tsuki/types'
 import { useAuthStore } from '@/stores/auth'
 
-defineProps<{ player: PalPlayer | null; busy?: boolean }>()
-const emit = defineEmits<{ close: []; kick: [PalPlayer]; ban: [PalPlayer] }>()
+defineProps<{ player: PalPlayer | null; busy?: boolean; canTeleport?: boolean }>()
+const emit = defineEmits<{
+  close: []
+  kick: [PalPlayer]
+  ban: [PalPlayer]
+  teleport: [PalPlayer]
+}>()
 
 const auth = useAuthStore()
 const copied = ref('')
@@ -98,6 +103,16 @@ function dash(v: string | number | null | undefined): string {
           </dl>
 
           <div v-if="auth.isAdmin" class="mt-6 flex justify-end gap-2">
+            <Button
+              v-if="canTeleport"
+              variant="outline"
+              size="sm"
+              :disabled="!player.playerId || busy"
+              class="mr-auto"
+              @click="emit('teleport', player)"
+            >
+              <Navigation /> Teleport
+            </Button>
             <Button
               variant="outline"
               size="sm"

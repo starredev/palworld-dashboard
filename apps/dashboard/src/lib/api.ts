@@ -18,6 +18,8 @@ import {
   configEventSchema,
   authConfigSchema,
   auditResponseSchema,
+  saveEditorStatusSchema,
+  playerLocationSchema,
   healthResponseSchema,
   palServerInfoSchema,
   palServerMetricsSchema,
@@ -52,6 +54,9 @@ import {
   type SessionResponse,
   type AuthConfig,
   type AuditResponse,
+  type SaveEditorStatus,
+  type PlayerLocation,
+  type Vec3,
 } from '@tsuki/types'
 import { apiFetch, apiUrl } from './http'
 
@@ -263,5 +268,22 @@ export const api = {
 
   getAudit(limit = 200): Promise<AuditResponse> {
     return apiFetch(`/audit?limit=${limit}`, { schema: auditResponseSchema })
+  },
+
+  getSaveStatus(): Promise<SaveEditorStatus> {
+    return apiFetch('/save/status', { schema: saveEditorStatusSchema })
+  },
+
+  getPlayerSaveLocation(uid: string): Promise<PlayerLocation> {
+    return apiFetch(`/save/players/${encodeURIComponent(uid)}/location`, {
+      schema: playerLocationSchema,
+    })
+  },
+
+  teleportPlayer(uid: string, coords: Vec3): Promise<{ ok: boolean }> {
+    return apiFetch(`/save/players/${encodeURIComponent(uid)}/teleport`, {
+      method: 'POST',
+      body: JSON.stringify(coords),
+    }) as Promise<{ ok: boolean }>
   },
 }

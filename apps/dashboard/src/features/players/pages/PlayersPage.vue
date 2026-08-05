@@ -8,10 +8,13 @@ import { api } from '@/lib/api'
 import { useServerStatus } from '@/composables/use-server'
 import { usePlayers } from '@/composables/use-players'
 import { useServerCommands } from '@/composables/use-commands'
+import { useSaveStatus } from '@/composables/use-save-editor'
+import { useAuthStore } from '@/stores/auth'
 import PagePlaceholder from '@/components/common/PagePlaceholder.vue'
 import PlayerTable, { type SortKey } from '../components/PlayerTable.vue'
 import OfflinePlayersTable from '../components/OfflinePlayersTable.vue'
 import PlayerDetailDialog from '../components/PlayerDetailDialog.vue'
+import TeleportDialog from '../components/TeleportDialog.vue'
 
 const status = useServerStatus()
 const statusData = computed(() => status.data.value)
@@ -66,6 +69,14 @@ const roster = useQuery({
 const offlinePlayers = computed(() => (roster.data.value?.players ?? []).filter((p) => !p.online))
 
 const selected = ref<PalPlayer | null>(null)
+const teleporting = ref<PalPlayer | null>(null)
+
+const auth = useAuthStore()
+const saveStatus = useSaveStatus()
+const canTeleport = computed(() => auth.isAdmin && saveStatus.data.value?.canWrite === true)
+// Online players other than the one being teleported — targets to copy a
+// position from (they have a saved location to read).
+const teleportTargets = computed(() => list.value.filter((p) => p !== teleporting.value))
 
 const { kick, ban } = useServerCommands()
 const actingId = ref<string | null>(null)
@@ -157,9 +168,18 @@ function confirmBan(): void {
     <PlayerDetailDialog
       :player="selected"
       :busy="actingId !== null"
+      :can-teleport="canTeleport"
       @close="selected = null"
       @kick="(p) => ((selected = null), onKick(p))"
       @ban="(p) => ((selected = null), (banTarget = p))"
+      @teleport="(p) => ((selected = null), (teleporting = p))"
+    />
+
+    <TeleportDialog
+      :player="teleporting"
+      :others="teleportTargets"
+      @close="teleporting = null"
+      @done="teleporting = null"
     />
 
     <ConfirmDialog
