@@ -106,6 +106,14 @@ export class PalworldClient {
     ).then(({ source }) => ({ source }))
   }
 
+  /** Force-stop the server (no graceful save — leaves PalWorldSettings.ini intact). */
+  stop(): Promise<{ source: PalSource }> {
+    return this.prefer(
+      (r) => r.stop(),
+      (c) => c.stop().then(() => undefined),
+    ).then(({ source }) => ({ source }))
+  }
+
   /** Run a REST op, falling back to an RCON op; report which source answered. */
   private async prefer<T>(
     restFn: (rest: PalworldRestClient) => Promise<T>,

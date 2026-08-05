@@ -1,10 +1,9 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { useMutation, useQuery } from '@tanstack/vue-query'
-import { Save, RotateCw, DownloadCloud, Loader2, Check, TriangleAlert } from 'lucide-vue-next'
+import { RotateCw, DownloadCloud, Loader2, Check, TriangleAlert } from 'lucide-vue-next'
 import { Card, CardContent, Button, ConfirmDialog } from '@tsuki/ui'
 import { api } from '@/lib/api'
-import { useServerCommands } from '@/composables/use-commands'
 
 const props = defineProps<{ body: string }>()
 const emit = defineEmits<{ load: [content: string] }>()
@@ -24,24 +23,19 @@ watch(
   { immediate: true },
 )
 
-const save = useMutation({ mutationFn: () => api.saveGameConfig(props.body) })
-const saved = ref(false)
-function onSave(): void {
-  save.mutate(undefined, {
+// Writing the ini and force-restarting is one atomic action: a plain save would
+// be silently reverted by the game's graceful-shutdown rewrite.
+const apply = useMutation({ mutationFn: () => api.applyGameConfig(props.body) })
+const applied = ref(false)
+const applyOpen = ref(false)
+function confirmApply(): void {
+  apply.mutate(undefined, {
     onSuccess: () => {
-      saved.value = true
-      setTimeout(() => (saved.value = false), 2000)
+      applyOpen.value = false
+      applied.value = true
+      setTimeout(() => (applied.value = false), 4000)
     },
   })
-}
-
-const { shutdown } = useServerCommands()
-const restartOpen = ref(false)
-function confirmRestart(): void {
-  shutdown.mutate(
-    { seconds: 5, message: 'Restarting to apply new settings' },
-    { onSuccess: () => (restartOpen.value = false) },
-  )
 }
 </script>
 
@@ -50,7 +44,7 @@ function confirmRestart(): void {
     <CardContent class="space-y-3 p-4">
       <div class="flex flex-wrap items-center gap-2">
         <span class="mr-auto text-sm text-muted-foreground">
-          Live server config detected — edit above, save, then restart to apply.
+          Live server config detected — edit above, then Save &amp; restart to apply.
         </span>
         <Button
           variant="outline"
@@ -59,43 +53,40 @@ function confirmRestart(): void {
           <DownloadCloud />
           Reload
         </Button>
-        <Button :disabled="save.isPending.value" @click="onSave">
-          <Loader2 v-if="save.isPending.value" class="animate-spin" />
-          <Check v-else-if="saved" />
-          <Save v-else />
-          {{ saved ? 'Saved' : 'Save to server' }}
-        </Button>
-        <Button variant="destructive" @click="restartOpen = true">
-          <RotateCw />
-          Restart
+        <Button variant="destructive" @click="applyOpen = true">
+          <Loader2 v-if="apply.isPending.value" class="animate-spin" />
+          <Check v-else-if="applied" />
+          <RotateCw v-else />
+          {{ applied ? 'Applied' : 'Save & restart' }}
         </Button>
       </div>
       <p
-        v-if="save.error.value"
+        v-if="apply.error.value"
         class="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
       >
-        Save failed: {{ save.error.value.message }}. The API may not have write access to
+        Apply failed: {{ apply.error.value.message }}. The API may not have write access to
         PalWorldSettings.ini — check the api logs.
       </p>
       <p class="flex items-start gap-2 text-xs text-muted-foreground/80">
         <TriangleAlert class="mt-0.5 size-3.5 shrink-0" />
         <span>
-          If your server image regenerates settings from environment variables on boot (e.g.
-          palworld-server-docker), edits won't persist. Set
-          <span class="font-mono">DISABLE_GENERATE_SETTINGS=true</span> on the game server so this
-          file stays the source of truth.
+          Edits are written and applied with a <span class="font-mono">force-restart</span> — a
+          normal shutdown would let the game overwrite the file from memory. If your server image
+          regenerates settings from environment variables on boot (e.g. palworld-server-docker),
+          also set <span class="font-mono">DISABLE_GENERATE_SETTINGS=true</span> so this file stays
+          the source of truth.
         </span>
       </p>
     </CardContent>
 
     <ConfirmDialog
-      v-model:open="restartOpen"
-      title="Restart the server?"
-      description="The server shuts down and your restart policy brings it back with the saved config. Players disconnect briefly."
+      v-model:open="applyOpen"
+      title="Save & restart the server?"
+      description="Your changes are written to PalWorldSettings.ini and the server is force-restarted so they take effect. Players disconnect for the short time it takes to come back up. This is the only way edits reliably survive — a graceful shutdown would overwrite them."
       tone="destructive"
-      confirm-label="Restart"
-      :loading="shutdown.isPending.value"
-      @confirm="confirmRestart"
+      confirm-label="Save & restart"
+      :loading="apply.isPending.value"
+      @confirm="confirmApply"
     />
   </Card>
 </template>

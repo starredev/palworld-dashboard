@@ -53,6 +53,11 @@ export class PalworldRconClient {
     return this.run((c) => c.exec(`Shutdown ${seconds} ${message.replace(/\s+/g, '_')}`))
   }
 
+  /** Force-stop the server (DoExit) — no graceful save, so the ini is left intact. */
+  stop(): Promise<string> {
+    return this.run((c) => c.exec('DoExit'))
+  }
+
   /** Verify the connection + credentials are valid. */
   async ping(): Promise<boolean> {
     try {

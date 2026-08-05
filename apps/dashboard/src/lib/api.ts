@@ -10,6 +10,7 @@ import {
   logsResponseSchema,
   gameConfigSchema,
   gameConfigWriteResultSchema,
+  gameConfigApplyResultSchema,
   healthResponseSchema,
   palServerInfoSchema,
   palServerMetricsSchema,
@@ -22,6 +23,7 @@ import {
   type CommandResult,
   type GameConfig,
   type GameConfigWriteResult,
+  type GameConfigApplyResult,
   type GuildsResponse,
   type HealthResponse,
   type LogsResponse,
@@ -58,6 +60,14 @@ export const api = {
       method: 'PUT',
       body: JSON.stringify({ body }),
       schema: gameConfigWriteResultSchema,
+    })
+  },
+
+  applyGameConfig(body: string): Promise<GameConfigApplyResult> {
+    return apiFetch('/server/config/apply', {
+      method: 'POST',
+      body: JSON.stringify({ body }),
+      schema: gameConfigApplyResultSchema,
     })
   },
 

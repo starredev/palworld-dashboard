@@ -93,6 +93,15 @@ export class PalworldRestClient {
     return this.http.post(`${API_PREFIX}/shutdown`, { waittime, message })
   }
 
+  /**
+   * Force-stop the server. Unlike `shutdown`, this does NOT trigger the game's
+   * graceful save, so it does not rewrite PalWorldSettings.ini — the key to
+   * making ini edits survive a restart.
+   */
+  stop(): Promise<void> {
+    return this.http.post(`${API_PREFIX}/stop`)
+  }
+
   async ping(): Promise<boolean> {
     try {
       await this.getInfo()

@@ -30,3 +30,12 @@ export const gameConfigWriteResultSchema = z.object({
   path: z.string(),
 })
 export type GameConfigWriteResult = z.infer<typeof gameConfigWriteResultSchema>
+
+/** Result of writing the ini AND force-restarting so the change takes effect. */
+export const gameConfigApplyResultSchema = z.object({
+  ok: z.boolean(),
+  path: z.string(),
+  /** True when a running server was force-stopped (restart policy brings it back). */
+  restarted: z.boolean(),
+})
+export type GameConfigApplyResult = z.infer<typeof gameConfigApplyResultSchema>
