@@ -16,6 +16,7 @@ import {
   configProfilesStateSchema,
   configEventSchema,
   authConfigSchema,
+  auditResponseSchema,
   healthResponseSchema,
   palServerInfoSchema,
   palServerMetricsSchema,
@@ -48,6 +49,7 @@ import {
   type PlayersResponse,
   type SessionResponse,
   type AuthConfig,
+  type AuditResponse,
 } from '@tsuki/types'
 import { apiFetch, apiUrl } from './http'
 
@@ -251,5 +253,9 @@ export const api = {
 
   getLogs(lines = 1000): Promise<LogsResponse> {
     return apiFetch(`/logs?lines=${lines}`, { schema: logsResponseSchema })
+  },
+
+  getAudit(limit = 200): Promise<AuditResponse> {
+    return apiFetch(`/audit?limit=${limit}`, { schema: auditResponseSchema })
   },
 }

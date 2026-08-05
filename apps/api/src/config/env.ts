@@ -101,6 +101,9 @@ const envSchema = z.object({
   // ---- Config profiles & scheduled events (persisted on the backups volume) ----
   CONFIG_PROFILES_PATH: z.string().default('/backups/tsuki-config-profiles.json'),
 
+  // ---- Activity / audit log (persisted on the backups volume) ----
+  AUDIT_LOG_PATH: z.string().default('/backups/tsuki-audit.json'),
+
   // ---- Guilds & Pals via the live-map's GameData API (optional) ----
   GAMEDATA_URL: emptyToUndefined(z.string().url().optional()),
   GAMEDATA_STATE_PATH: z.string().default('/api/state'),

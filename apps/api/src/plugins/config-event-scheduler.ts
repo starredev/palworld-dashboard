@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import { applyIniAndRestart } from '../services/config-apply'
 import { isConfigAvailable } from '../services/game-config'
 import { getEvents, getProfile, markEvent } from '../services/config-profiles'
+import { recordAudit } from '../services/audit'
 
 const TICK_MS = 20_000
 
@@ -27,6 +28,12 @@ export async function registerConfigEventScheduler(app: FastifyInstance): Promis
     try {
       await applyIniAndRestart(app, profile.body, message)
       app.log.info(`Config event applied profile "${profile.name}".`)
+      recordAudit({
+        actorId: 'system',
+        actorName: 'Scheduler',
+        action: 'event.fire',
+        summary: `${fallbackPrefix}: ${profile.name}`,
+      })
     } catch (error) {
       app.log.error({ err: error }, 'config event apply failed')
     }

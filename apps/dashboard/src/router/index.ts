@@ -68,6 +68,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: 'Backups' },
       },
       {
+        path: 'activity',
+        name: 'activity',
+        component: () => import('@/features/activity/pages/ActivityPage.vue'),
+        meta: { title: 'Activity' },
+      },
+      {
         path: ':pathMatch(.*)*',
         name: 'not-found',
         component: () => import('@/features/misc/pages/NotFoundPage.vue'),

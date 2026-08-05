@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import { PalworldNotConfiguredError } from '@tsuki/sdk'
 import type { RestartSchedule } from '@tsuki/types'
 import { getSchedule } from '../services/restart-schedule'
+import { recordAudit } from '../services/audit'
 
 const TICK_MS = 20_000
 // How long after the target time we may still fire (catches brief downtime).
@@ -63,6 +64,12 @@ export async function registerRestartScheduler(app: FastifyInstance): Promise<vo
         app.log.warn({ err: error }, 'scheduled stop errored (server likely restarting)')
       }
     }
+    recordAudit({
+      actorId: 'system',
+      actorName: 'Scheduler',
+      action: 'schedule.restart.fire',
+      summary: 'Scheduled restart',
+    })
   }
 
   async function tick(): Promise<void> {

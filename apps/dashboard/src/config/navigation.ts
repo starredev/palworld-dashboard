@@ -8,6 +8,7 @@ import {
   SlidersHorizontal,
   ScrollText,
   Archive,
+  History,
   type LucideIcon,
 } from 'lucide-vue-next'
 
@@ -28,4 +29,5 @@ export const NAV_ITEMS: NavItem[] = [
   { label: 'Config', to: '/config', icon: SlidersHorizontal },
   { label: 'Logs', to: '/logs', icon: ScrollText },
   { label: 'Backups', to: '/backups', icon: Archive },
+  { label: 'Activity', to: '/activity', icon: History },
 ]
