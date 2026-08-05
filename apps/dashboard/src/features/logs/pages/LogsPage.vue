@@ -63,7 +63,7 @@ watch(lines, async () => {
       v-if="unavailable"
       :icon="ScrollText"
       title="Logs unavailable"
-      description="Mount your Palworld data dir and set PALWORLD_LOG_PATH so the panel can read Pal.log."
+      description="Point the panel at your server's logs: set PALWORLD_CONTAINER (to read docker logs) or mount the data dir with a Pal.log file at PALWORLD_LOG_PATH."
     />
 
     <Card v-else class="overflow-hidden">

@@ -46,6 +46,9 @@ services:
       # Path (inside the api container) to the server log for the Logs page.
       # Defaults to the standard location under the mounted data dir.
       PALWORLD_LOG_PATH: ${PALWORLD_LOG_PATH:-/palworld-data/Pal/Saved/Logs/Pal.log}
+      # If the server logs only to stdout, set this to the game container's name
+      # to read `docker logs` instead (also mount the socket — see compose.palworld.yml).
+      PALWORLD_CONTAINER: ${PALWORLD_CONTAINER:-}
       # Guilds & Pals via the live-map's GameData API (internal URL + paths).
       GAMEDATA_URL: ${GAMEDATA_URL:-}
       GAMEDATA_STATE_PATH: ${GAMEDATA_STATE_PATH:-/api/state}

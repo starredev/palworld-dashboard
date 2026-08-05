@@ -15,8 +15,13 @@ services:
     # Optional: mount the Palworld data dir to edit PalWorldSettings.ini live.
     # Set PALWORLD_DATA_DIR in .env to the host path of the game server's data
     # (the dir the palworld container mounts, e.g. /home/palworld/.../palworld).
+    #
+    # The Docker socket is mounted READ-ONLY so the Logs page can read the game
+    # container's `docker logs` (set PALWORLD_CONTAINER in .env). Remove this
+    # line if you don't want the api to have socket access.
     volumes:
       - ${PALWORLD_DATA_DIR:-./palworld-data}:/palworld-data
+      - /var/run/docker.sock:/var/run/docker.sock:ro
 
 networks:
   palworld:

@@ -114,6 +114,10 @@ const envSchema = z.object({
 
   // ---- Logs viewer (optional) ----
   PALWORLD_LOG_PATH: z.string().default('/palworld-data/Pal/Saved/Logs/Pal.log'),
+  // If the server logs only to stdout (no file), read `docker logs` instead:
+  // set PALWORLD_CONTAINER to the game container's name and mount the socket.
+  PALWORLD_CONTAINER: emptyToUndefined(z.string().optional()),
+  DOCKER_SOCKET: z.string().default('/var/run/docker.sock'),
 
   // ---- Scheduled ini-safe restart (configured from the panel, persisted here) ----
   // Lives on the writable backups volume by default so it survives redeploys.
