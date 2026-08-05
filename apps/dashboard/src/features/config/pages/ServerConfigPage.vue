@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { Card, CardHeader, CardTitle, CardContent, Button } from '@tsuki/ui'
+import { useAuthStore } from '@/stores/auth'
 import { GROUPS, FIELDS } from '../fields'
 import { PRESETS } from '../presets'
 import { useConfigEditor } from '../use-config-editor'
@@ -11,6 +12,7 @@ import RestartScheduleCard from '../components/RestartScheduleCard.vue'
 import ConfigProfilesCard from '../components/ConfigProfilesCard.vue'
 import ConfigEventsCard from '../components/ConfigEventsCard.vue'
 
+const auth = useAuthStore()
 const { values, activePreset, applyPreset, importText, ini, body, changedCount } = useConfigEditor()
 
 const grouped = computed(() =>
@@ -28,14 +30,22 @@ const grouped = computed(() =>
       </p>
     </header>
 
-    <ServerConfigActions :body="body" @load="importText" />
+    <template v-if="auth.isAdmin">
+      <ServerConfigActions :body="body" @load="importText" />
 
-    <div class="grid gap-6 lg:grid-cols-2">
-      <ConfigProfilesCard :body="body" />
-      <ConfigEventsCard />
-    </div>
+      <div class="grid gap-6 lg:grid-cols-2">
+        <ConfigProfilesCard :body="body" />
+        <ConfigEventsCard />
+      </div>
 
-    <RestartScheduleCard />
+      <RestartScheduleCard />
+    </template>
+    <p
+      v-else
+      class="rounded-lg border border-border bg-card/40 px-4 py-3 text-sm text-muted-foreground"
+    >
+      You're signed in as a viewer — settings are read-only. Ask an admin to apply changes.
+    </p>
 
     <div class="flex flex-wrap gap-2">
       <Button

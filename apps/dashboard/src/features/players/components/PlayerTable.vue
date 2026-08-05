@@ -2,6 +2,9 @@
 import type { PalPlayer } from '@tsuki/types'
 import { UserX, Ban, ChevronUp, ChevronDown } from 'lucide-vue-next'
 import { Card, Button } from '@tsuki/ui'
+import { useAuthStore } from '@/stores/auth'
+
+const auth = useAuthStore()
 
 export type SortKey = 'name' | 'level' | 'ping'
 
@@ -41,7 +44,7 @@ function dash(value: string | number | null | undefined): string {
               </button>
             </th>
             <th class="px-5 py-3 font-medium">Player ID</th>
-            <th class="px-5 py-3 text-right font-medium">Actions</th>
+            <th v-if="auth.isAdmin" class="px-5 py-3 text-right font-medium">Actions</th>
           </tr>
         </thead>
         <tbody>
@@ -58,7 +61,7 @@ function dash(value: string | number | null | undefined): string {
             <td class="px-5 py-3 font-mono text-xs text-muted-foreground">
               {{ dash(player.playerId ?? player.userId) }}
             </td>
-            <td class="px-5 py-3">
+            <td v-if="auth.isAdmin" class="px-5 py-3">
               <div class="flex justify-end gap-1.5">
                 <Button
                   size="sm"

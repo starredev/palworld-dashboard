@@ -40,12 +40,32 @@ async function signOut() {
       </RouterLink>
     </nav>
 
-    <button
-      class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
-      @click="signOut"
-    >
-      <LogOut class="size-4 shrink-0" />
-      Sign out
-    </button>
+    <div class="space-y-1">
+      <div v-if="auth.user" class="flex items-center gap-2.5 px-3 py-2">
+        <img
+          v-if="auth.user.avatar"
+          :src="auth.user.avatar"
+          alt=""
+          class="size-7 shrink-0 rounded-full"
+        />
+        <span
+          v-else
+          class="grid size-7 shrink-0 place-items-center rounded-full bg-muted text-xs font-semibold uppercase"
+        >
+          {{ auth.user.name.charAt(0) }}
+        </span>
+        <div class="min-w-0 flex-1">
+          <p class="truncate text-sm font-medium">{{ auth.user.name }}</p>
+          <p class="text-xs capitalize text-muted-foreground">{{ auth.user.role }}</p>
+        </div>
+      </div>
+      <button
+        class="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+        @click="signOut"
+      >
+        <LogOut class="size-4 shrink-0" />
+        Sign out
+      </button>
+    </div>
   </aside>
 </template>

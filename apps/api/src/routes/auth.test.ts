@@ -31,7 +31,9 @@ describe('auth routes', () => {
       cookies: { tsuki_session: cookie!.value },
     })
     expect(me.statusCode).toBe(200)
-    expect(me.json()).toEqual({ user: { id: 'admin', role: 'admin' } })
+    expect(me.json()).toEqual({
+      user: { id: 'admin', name: 'Admin', role: 'admin', avatar: null, via: 'password' },
+    })
 
     await app.close()
   })

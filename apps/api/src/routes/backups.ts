@@ -1,7 +1,7 @@
 import { createReadStream, existsSync } from 'node:fs'
 import type { FastifyInstance } from 'fastify'
 import type { BackupsResponse } from '@tsuki/types'
-import { authenticate } from '../plugins/auth'
+import { authenticate, requireAdmin } from '../plugins/auth'
 import { loadEnv } from '../config/env'
 import {
   backupPath,
@@ -22,7 +22,7 @@ export async function backupRoutes(app: FastifyInstance): Promise<void> {
     return { available: isBackupAvailable(), backups: listBackups(), schedule }
   })
 
-  app.post('/backups', { preHandler: authenticate }, async (_req, reply) => {
+  app.post('/backups', { preHandler: requireAdmin }, async (_req, reply) => {
     if (!isBackupAvailable()) return reply.status(503).send({ message: 'Save data is not mounted' })
     try {
       return createBackup()
@@ -51,7 +51,7 @@ export async function backupRoutes(app: FastifyInstance): Promise<void> {
 
   app.post<{ Params: { name: string } }>(
     '/backups/:name/restore',
-    { preHandler: authenticate },
+    { preHandler: requireAdmin },
     async (req, reply) => {
       if (!isBackupAvailable())
         return reply.status(503).send({ message: 'Save data is not mounted' })
@@ -67,7 +67,7 @@ export async function backupRoutes(app: FastifyInstance): Promise<void> {
 
   app.delete<{ Params: { name: string } }>(
     '/backups/:name',
-    { preHandler: authenticate },
+    { preHandler: requireAdmin },
     async (req, reply) => {
       try {
         deleteBackup(req.params.name)

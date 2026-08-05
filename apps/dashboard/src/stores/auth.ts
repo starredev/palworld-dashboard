@@ -1,26 +1,37 @@
 import { defineStore } from 'pinia'
-import { ref } from 'vue'
-import type { SessionUser } from '@tsuki/types'
+import { computed, ref } from 'vue'
+import type { AuthConfig, SessionUser } from '@tsuki/types'
 import { api } from '@/lib/api'
-import { ApiError } from '@/lib/http'
 
 export const useAuthStore = defineStore('auth', () => {
   const user = ref<SessionUser | null>(null)
+  const authConfig = ref<AuthConfig | null>(null)
   const ready = ref(false)
 
-  /** Resolve the current session once on app start (401 → unauthenticated). */
+  const isAdmin = computed(() => user.value?.role === 'admin')
+
+  /**
+   * Resolve the current session once on app start. Any failure (401, or a stale
+   * pre-upgrade cookie that no longer matches the session shape) simply means
+   * "not signed in" — never block app load.
+   */
   async function fetchSession(): Promise<void> {
     try {
       const { user: sessionUser } = await api.getSession()
       user.value = sessionUser
-    } catch (error) {
-      if (error instanceof ApiError && error.status === 401) {
-        user.value = null
-      } else {
-        throw error
-      }
+    } catch {
+      user.value = null
     } finally {
       ready.value = true
+    }
+  }
+
+  /** Which login methods the server offers (password / Discord). */
+  async function fetchAuthConfig(): Promise<void> {
+    try {
+      authConfig.value = await api.getAuthConfig()
+    } catch {
+      authConfig.value = { passwordLogin: true, discord: false }
     }
   }
 
@@ -34,5 +45,5 @@ export const useAuthStore = defineStore('auth', () => {
     user.value = null
   }
 
-  return { user, ready, fetchSession, login, logout }
+  return { user, authConfig, ready, isAdmin, fetchSession, fetchAuthConfig, login, logout }
 })

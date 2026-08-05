@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import { restartScheduleSchema, type RestartScheduleState } from '@tsuki/types'
-import { authenticate } from '../plugins/auth'
+import { authenticate, requireAdmin } from '../plugins/auth'
 import { computeNextRun, getSchedule, saveSchedule } from '../services/restart-schedule'
 
 function withNextRun(schedule: ReturnType<typeof getSchedule>): RestartScheduleState {
@@ -16,7 +16,7 @@ export async function restartScheduleRoutes(app: FastifyInstance): Promise<void>
     async (): Promise<RestartScheduleState> => withNextRun(getSchedule()),
   )
 
-  app.put('/server/restart-schedule', { preHandler: authenticate }, async (req, reply) => {
+  app.put('/server/restart-schedule', { preHandler: requireAdmin }, async (req, reply) => {
     const parsed = restartScheduleSchema.safeParse(req.body)
     if (!parsed.success) {
       return reply

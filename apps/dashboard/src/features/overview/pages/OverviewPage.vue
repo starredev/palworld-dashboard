@@ -2,12 +2,14 @@
 import { computed } from 'vue'
 import { Users, Gauge, Clock, CalendarDays, PlugZap, ServerOff } from 'lucide-vue-next'
 import { formatUptime } from '@tsuki/shared'
+import { useAuthStore } from '@/stores/auth'
 import { useServerOverview } from '@/composables/use-server'
 import StatCard from '../components/StatCard.vue'
 import ServerControls from '../components/ServerControls.vue'
 import ActivityFeed from '../components/ActivityFeed.vue'
 import PagePlaceholder from '@/components/common/PagePlaceholder.vue'
 
+const auth = useAuthStore()
 const { status, metrics, info } = useServerOverview()
 
 const statusData = computed(() => status.data.value)
@@ -67,7 +69,7 @@ const inGameDay = computed(() => m.value?.days ?? undefined)
     </div>
 
     <div v-if="reachable" class="grid gap-4 lg:grid-cols-2">
-      <ServerControls />
+      <ServerControls v-if="auth.isAdmin" />
       <ActivityFeed />
     </div>
   </section>

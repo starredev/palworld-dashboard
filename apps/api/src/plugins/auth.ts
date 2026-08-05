@@ -25,6 +25,22 @@ export async function authenticate(request: FastifyRequest, reply: FastifyReply)
   }
 }
 
+/**
+ * preHandler for mutating endpoints: must be signed in AND an admin. Viewers get
+ * 403 so read-only accounts can browse but never change or restart the server.
+ */
+export async function requireAdmin(request: FastifyRequest, reply: FastifyReply): Promise<void> {
+  try {
+    await request.jwtVerify()
+  } catch {
+    await reply.status(401).send({ message: 'Unauthorized' })
+    return
+  }
+  if (request.user.role !== 'admin') {
+    await reply.status(403).send({ message: 'Admins only' })
+  }
+}
+
 /** Options for the session cookie, derived from the current environment. */
 export function sessionCookieOptions() {
   const env = loadEnv()

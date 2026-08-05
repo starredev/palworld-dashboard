@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import { PalworldNotConfiguredError } from '@tsuki/sdk'
-import { authenticate } from '../plugins/auth'
+import { authenticate, requireAdmin } from '../plugins/auth'
 import { runCommand } from './commands'
 
 export async function playerRoutes(app: FastifyInstance): Promise<void> {
@@ -18,19 +18,19 @@ export async function playerRoutes(app: FastifyInstance): Promise<void> {
 
   app.post<{ Params: { userId: string } }>(
     '/players/:userId/kick',
-    { preHandler: authenticate },
+    { preHandler: requireAdmin },
     (req, reply) => runCommand(reply, () => app.palworld.kick(req.params.userId)),
   )
 
   app.post<{ Params: { userId: string } }>(
     '/players/:userId/ban',
-    { preHandler: authenticate },
+    { preHandler: requireAdmin },
     (req, reply) => runCommand(reply, () => app.palworld.ban(req.params.userId)),
   )
 
   app.post<{ Params: { userId: string } }>(
     '/players/:userId/unban',
-    { preHandler: authenticate },
+    { preHandler: requireAdmin },
     (req, reply) => runCommand(reply, () => app.palworld.unban(req.params.userId)),
   )
 }

@@ -15,6 +15,7 @@ import {
   configProfileSchema,
   configProfilesStateSchema,
   configEventSchema,
+  authConfigSchema,
   healthResponseSchema,
   palServerInfoSchema,
   palServerMetricsSchema,
@@ -46,6 +47,7 @@ import {
   type PalStatus,
   type PlayersResponse,
   type SessionResponse,
+  type AuthConfig,
 } from '@tsuki/types'
 import { apiFetch, apiUrl } from './http'
 
@@ -143,6 +145,15 @@ export const api = {
 
   getSession(): Promise<SessionResponse> {
     return apiFetch('/auth/me', { schema: sessionResponseSchema })
+  },
+
+  getAuthConfig(): Promise<AuthConfig> {
+    return apiFetch('/auth/config', { schema: authConfigSchema })
+  },
+
+  /** Full-page redirect into the Discord OAuth flow. */
+  discordLoginUrl(): string {
+    return apiUrl('/auth/discord')
   },
 
   getServerStatus(): Promise<PalStatus> {

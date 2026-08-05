@@ -14,11 +14,40 @@ const envSchema = z.object({
     .transform((value) => value.split(',').map((origin) => origin.trim())),
   NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
 
-  // ---- Auth (single-admin session) ----
+  // ---- Auth (bootstrap admin password + optional Discord OAuth) ----
   AUTH_PASSWORD: z.string().min(1).default('admin'),
   JWT_SECRET: z.string().min(16).default('dev-insecure-secret-change-me-please'),
   COOKIE_NAME: z.string().default('tsuki_session'),
   SESSION_TTL: z.string().default('7d'),
+
+  // ---- Discord OAuth login (optional; all three required to enable) ----
+  DISCORD_CLIENT_ID: emptyToUndefined(z.string().optional()),
+  DISCORD_CLIENT_SECRET: emptyToUndefined(z.string().optional()),
+  // Absolute callback URL registered in the Discord app, e.g.
+  // https://panel.example.com/api/auth/discord/callback
+  DISCORD_REDIRECT_URI: emptyToUndefined(z.string().url().optional()),
+  // Who may sign in: members of this guild and/or this explicit id allowlist.
+  // If NEITHER is set, Discord login is refused (fail closed).
+  DISCORD_GUILD_ID: emptyToUndefined(z.string().optional()),
+  DISCORD_ALLOWED_IDS: z
+    .string()
+    .default('')
+    .transform((v) =>
+      v
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean),
+    ),
+  // Discord user ids that get the admin role; everyone else allowed = viewer.
+  DISCORD_ADMIN_IDS: z
+    .string()
+    .default('')
+    .transform((v) =>
+      v
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean),
+    ),
   // Force the session cookie's `Secure` flag. Defaults to on in production.
   // Set to `false` when serving the compose demo over plain http://localhost.
   COOKIE_SECURE: z

@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify'
 import { gameConfigUpdateSchema, type GameConfig } from '@tsuki/types'
-import { authenticate } from '../plugins/auth'
+import { authenticate, requireAdmin } from '../plugins/auth'
 import { isConfigAvailable, readConfigFile, writeConfigFile } from '../services/game-config'
 import { applyIniAndRestart } from '../services/config-apply'
 
@@ -10,7 +10,7 @@ export async function gameConfigRoutes(app: FastifyInstance): Promise<void> {
     return { available: isConfigAvailable(), content: readConfigFile() }
   })
 
-  app.put('/server/config', { preHandler: authenticate }, async (req, reply) => {
+  app.put('/server/config', { preHandler: requireAdmin }, async (req, reply) => {
     if (!isConfigAvailable()) {
       return reply.status(503).send({ message: 'PalWorldSettings.ini is not mounted' })
     }
@@ -34,7 +34,7 @@ export async function gameConfigRoutes(app: FastifyInstance): Promise<void> {
    * that survives is: save the world → write the ini → *force*-stop (no graceful
    * save, no rewrite) → let the container's restart policy read the new file.
    */
-  app.post('/server/config/apply', { preHandler: authenticate }, async (req, reply) => {
+  app.post('/server/config/apply', { preHandler: requireAdmin }, async (req, reply) => {
     if (!isConfigAvailable()) {
       return reply.status(503).send({ message: 'PalWorldSettings.ini is not mounted' })
     }

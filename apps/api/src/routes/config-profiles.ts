@@ -4,7 +4,7 @@ import {
   configProfileInputSchema,
   type ConfigProfilesState,
 } from '@tsuki/types'
-import { authenticate } from '../plugins/auth'
+import { authenticate, requireAdmin } from '../plugins/auth'
 import { isConfigAvailable } from '../services/game-config'
 import { applyIniAndRestart } from '../services/config-apply'
 import {
@@ -34,21 +34,21 @@ export async function configProfileRoutes(app: FastifyInstance): Promise<void> {
     async (): Promise<ConfigProfilesState> => state(),
   )
 
-  app.post('/server/config/profiles', { preHandler: authenticate }, async (req, reply) => {
+  app.post('/server/config/profiles', { preHandler: requireAdmin }, async (req, reply) => {
     const parsed = configProfileInputSchema.safeParse(req.body)
     if (!parsed.success)
       return reply.status(400).send({ message: 'A name and settings are required' })
     return upsertProfile(parsed.data)
   })
 
-  app.delete('/server/config/profiles/:id', { preHandler: authenticate }, async (req) => {
+  app.delete('/server/config/profiles/:id', { preHandler: requireAdmin }, async (req) => {
     deleteProfile((req.params as { id: string }).id)
     return { ok: true }
   })
 
   app.post(
     '/server/config/profiles/:id/apply',
-    { preHandler: authenticate },
+    { preHandler: requireAdmin },
     async (req, reply) => {
       const profile = getProfile((req.params as { id: string }).id)
       if (!profile) return reply.status(404).send({ message: 'Profile not found' })
@@ -69,7 +69,7 @@ export async function configProfileRoutes(app: FastifyInstance): Promise<void> {
     },
   )
 
-  app.post('/server/config/events', { preHandler: authenticate }, async (req, reply) => {
+  app.post('/server/config/events', { preHandler: requireAdmin }, async (req, reply) => {
     const parsed = configEventInputSchema.safeParse(req.body)
     if (!parsed.success) return reply.status(400).send({ message: 'Invalid event' })
     if (new Date(parsed.data.endsAt) <= new Date(parsed.data.startsAt)) {
@@ -81,7 +81,7 @@ export async function configProfileRoutes(app: FastifyInstance): Promise<void> {
     return createEvent(parsed.data)
   })
 
-  app.delete('/server/config/events/:id', { preHandler: authenticate }, async (req) => {
+  app.delete('/server/config/events/:id', { preHandler: requireAdmin }, async (req) => {
     deleteEvent((req.params as { id: string }).id)
     return { ok: true }
   })
