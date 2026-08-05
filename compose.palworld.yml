@@ -16,12 +16,16 @@ services:
     # Set PALWORLD_DATA_DIR in .env to the host path of the game server's data
     # (the dir the palworld container mounts, e.g. /home/palworld/.../palworld).
     #
-    # The Docker socket is mounted READ-ONLY so the Logs page can read the game
-    # container's `docker logs` (set PALWORLD_CONTAINER in .env). Remove this
-    # line if you don't want the api to have socket access.
+    # The Docker socket lets the api (a) read the game container's `docker logs`
+    # for the Logs page, and (b) stop/start it for the save editor — a save edit
+    # must take the server down, rewrite the .sav, and bring it back up. Both
+    # need PALWORLD_CONTAINER set in .env. Mounted read-WRITE for the stop/start;
+    # remove this line (and the save editor is simply hidden) if you'd rather not
+    # grant socket access. NOTE: Docker socket access ~= host root — only enable
+    # on a server you control.
     volumes:
       - ${PALWORLD_DATA_DIR:-./palworld-data}:/palworld-data
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/run/docker.sock:/var/run/docker.sock:rw
     # The api runs as non-root, so add the host's `docker` group gid to let it
     # read the socket. Find it with:  getent group docker  → set DOCKER_GID.
     group_add:
