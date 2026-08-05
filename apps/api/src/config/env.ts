@@ -112,6 +112,12 @@ const envSchema = z.object({
   BACKUP_SCHEDULE_HOURS: z.coerce.number().nonnegative().default(0),
   BACKUP_RETENTION: z.coerce.number().int().positive().default(7),
 
+  // ---- Save-file editor (optional) — palworld-save-tools converts .sav <-> JSON ----
+  // Python interpreter and the vendored palworld-save-tools directory inside the
+  // api image (its convert.py is the entrypoint). Needs PALWORLD_SAVE_DIR mounted.
+  PYTHON_BIN: z.string().default('python3'),
+  SAVE_TOOLS_DIR: z.string().default('/opt/palworld-save-tools'),
+
   // ---- Logs viewer (optional) ----
   PALWORLD_LOG_PATH: z.string().default('/palworld-data/Pal/Saved/Logs/Pal.log'),
   // If the server logs only to stdout (no file), read `docker logs` instead:

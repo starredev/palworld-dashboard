@@ -29,6 +29,14 @@ FROM node:22-alpine AS runner
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=build /app ./
+
+# Save-file editor: Python 3 + the vendored palworld-save-tools converter
+# (stdlib-only, no pip deps). Pinned by tag; bump SAVE_TOOLS_REF to update.
+ARG SAVE_TOOLS_REF=v0.24.0
+RUN apk add --no-cache python3 && mkdir -p /opt/palworld-save-tools
+ADD https://github.com/cheahjs/palworld-save-tools/archive/refs/tags/${SAVE_TOOLS_REF}.tar.gz /tmp/pst.tar.gz
+RUN tar -xzf /tmp/pst.tar.gz -C /opt/palworld-save-tools --strip-components=1 && rm /tmp/pst.tar.gz
+
 # Own the backups mount point as `node` so the named volume is seeded with
 # node:node ownership (Docker copies the image dir's perms into a fresh volume),
 # letting the non-root process write save backups.

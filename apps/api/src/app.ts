@@ -21,6 +21,7 @@ import { configProfileRoutes } from './routes/config-profiles'
 import { auditRoutes } from './routes/audit'
 import { backupRoutes } from './routes/backups'
 import { gameDataRoutes } from './routes/gamedata'
+import { saveEditorRoutes } from './routes/save-editor'
 import { historyRoutes } from './routes/history'
 import { logRoutes } from './routes/logs'
 import { wsRoutes } from './routes/ws'
@@ -69,6 +70,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(auditRoutes, { prefix: '/api' })
   await app.register(backupRoutes, { prefix: '/api' })
   await app.register(gameDataRoutes, { prefix: '/api' })
+  await app.register(saveEditorRoutes, { prefix: '/api' })
   await app.register(historyRoutes, { prefix: '/api' })
   await app.register(logRoutes, { prefix: '/api' })
   await app.register(wsRoutes, { prefix: '/api' })
