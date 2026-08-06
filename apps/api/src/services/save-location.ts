@@ -6,7 +6,7 @@ import type { Vec3 } from '@tsuki/types'
  * and the exact parent path to `LastTransform` inside a player .sav isn't
  * pinned down by the tool docs — so we locate it defensively by name.
  */
-function deepFind(node: unknown, key: string): unknown {
+export function deepFind(node: unknown, key: string): unknown {
   if (!node || typeof node !== 'object') return undefined
   const obj = node as Record<string, unknown>
   if (key in obj) return obj[key]
