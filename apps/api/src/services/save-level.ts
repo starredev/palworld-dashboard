@@ -1,7 +1,9 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
+import type { FastifyInstance } from 'fastify'
 import type { LevelSummary, PlayerStats } from '@tsuki/types'
 import { readSaveJson, isSaveEditorAvailable } from './save-editor'
+import { editSaveFile } from './save-edit'
 import { deepFind } from './save-location'
 import { findWorldSaveDir } from './save-teleport'
 
@@ -145,6 +147,61 @@ export function parseLevelSummary(levelJson: unknown): Omit<LevelSummary, 'avail
 /** Read a player's stats + pals from Level.sav (decodes the whole file). */
 export async function readPlayerStats(uid: string): Promise<Omit<PlayerStats, 'available'>> {
   return parsePlayerStats(await readSaveJson(levelSavPath()), uid)
+}
+
+// ---- Writes (mutate the parsed Level.sav in place; run via editSaveFile) ----
+
+/** Locate the mutable SaveParameter dict of the matching player (a ref into json). */
+function findPlayerParamsRef(levelJson: unknown, uid: string): Record<string, unknown> | null {
+  for (const entry of characterEntries(levelJson)) {
+    const params = saveParam(entry)
+    if (
+      params &&
+      isPlayerParams(params) &&
+      uidMatches(dig(entry, 'key', 'PlayerUId', 'value'), uid)
+    )
+      return params
+  }
+  return null
+}
+
+/** Restore hunger + sanity to full. Fields are set only if present in the save. */
+export function refuelPlayer(params: Record<string, unknown>): void {
+  const fs = params['FullStomach']
+  if (isVN(fs)) fs.value = 150
+  const san = params['SanityValue']
+  if (isVN(san)) san.value = 100
+}
+
+/** Set a player's level in place (requires an existing Level field). */
+export function setPlayerLevel(params: Record<string, unknown>, level: number): void {
+  const inner = isVN(params['Level']) ? (params['Level'] as ValueNode).value : undefined
+  if (!isVN(inner)) throw new Error('Player has no Level field to set')
+  inner.value = level
+}
+
+/** Run a mutation against the matching player's record via the safe pipeline. */
+async function editPlayerInLevel(
+  app: FastifyInstance,
+  uid: string,
+  mutate: (params: Record<string, unknown>) => void,
+): Promise<void> {
+  await editSaveFile(app, levelSavPath(), (json) => {
+    const params = findPlayerParamsRef(json, uid)
+    if (!params) throw new Error('Player not found in Level.sav')
+    mutate(params)
+  })
+}
+
+export function refuelPlayerInLevel(app: FastifyInstance, uid: string): Promise<void> {
+  return editPlayerInLevel(app, uid, refuelPlayer)
+}
+export function setPlayerLevelInLevel(
+  app: FastifyInstance,
+  uid: string,
+  level: number,
+): Promise<void> {
+  return editPlayerInLevel(app, uid, (params) => setPlayerLevel(params, level))
 }
 
 /** Decode Level.sav and count players/pals — cheap validation of the decode path. */

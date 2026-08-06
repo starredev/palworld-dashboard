@@ -79,6 +79,12 @@ export const levelSummarySchema = z.object({
 })
 export type LevelSummary = z.infer<typeof levelSummarySchema>
 
+/** Set a player's level (Palworld caps well under 100). */
+export const playerLevelInputSchema = z.object({
+  level: z.number().int().min(1).max(100),
+})
+export type PlayerLevelInput = z.infer<typeof playerLevelInputSchema>
+
 /** Set a player's technology points (at least one field required). */
 export const techPointsInputSchema = z
   .object({

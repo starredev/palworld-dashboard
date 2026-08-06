@@ -5,6 +5,7 @@ import { X, UserX, Ban, Copy, Check, MapPin, Navigation } from 'lucide-vue-next'
 import { Button } from '@tsuki/ui'
 import type { PalPlayer } from '@tsuki/types'
 import { useAuthStore } from '@/stores/auth'
+import PlayerSaveSection from './PlayerSaveSection.vue'
 
 defineProps<{ player: PalPlayer | null; busy?: boolean; canTeleport?: boolean }>()
 const emit = defineEmits<{
@@ -130,6 +131,8 @@ function dash(v: string | number | null | undefined): string {
               <Ban /> Ban
             </Button>
           </div>
+
+          <PlayerSaveSection v-if="canTeleport" :player="player" :can-edit="canTeleport" />
         </div>
       </div>
     </Transition>

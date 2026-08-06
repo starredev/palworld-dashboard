@@ -2,6 +2,7 @@ import type { FastifyInstance } from 'fastify'
 import {
   teleportInputSchema,
   techPointsInputSchema,
+  playerLevelInputSchema,
   type LevelSummary,
   type PlayerDetail,
   type PlayerLocation,
@@ -14,7 +15,13 @@ import { isSaveEditorAvailable } from '../services/save-editor'
 import { isSaveEditAvailable } from '../services/save-edit'
 import { readPlayerLocation, teleportPlayer } from '../services/save-teleport'
 import { giveTechPoints, readPlayerDetail } from '../services/save-player-fields'
-import { isLevelAvailable, readLevelSummary, readPlayerStats } from '../services/save-level'
+import {
+  isLevelAvailable,
+  readLevelSummary,
+  readPlayerStats,
+  refuelPlayerInLevel,
+  setPlayerLevelInLevel,
+} from '../services/save-level'
 
 interface UidParams {
   uid: string
@@ -120,6 +127,46 @@ export async function saveEditorRoutes(app: FastifyInstance): Promise<void> {
       }
       try {
         await giveTechPoints(app, req.params.uid, parsed.data)
+        return { ok: true }
+      } catch (error) {
+        reply.log.error(error)
+        return reply.status(500).send({ message: (error as Error).message })
+      }
+    },
+  )
+
+  // Write (Level.sav): restore hunger + sanity to full for a player.
+  app.post<{ Params: UidParams }>(
+    '/save/players/:uid/refuel',
+    { preHandler: requireAdmin },
+    async (req, reply) => {
+      if (!isSaveEditAvailable() || !isLevelAvailable()) {
+        return reply.status(503).send({ message: 'Level.sav editing is not available' })
+      }
+      try {
+        await refuelPlayerInLevel(app, req.params.uid)
+        return { ok: true }
+      } catch (error) {
+        reply.log.error(error)
+        return reply.status(500).send({ message: (error as Error).message })
+      }
+    },
+  )
+
+  // Write (Level.sav): set a player's level.
+  app.post<{ Params: UidParams }>(
+    '/save/players/:uid/level',
+    { preHandler: requireAdmin },
+    async (req, reply) => {
+      if (!isSaveEditAvailable() || !isLevelAvailable()) {
+        return reply.status(503).send({ message: 'Level.sav editing is not available' })
+      }
+      const parsed = playerLevelInputSchema.safeParse(req.body)
+      if (!parsed.success) {
+        return reply.status(400).send({ message: 'A level between 1 and 100 is required' })
+      }
+      try {
+        await setPlayerLevelInLevel(app, req.params.uid, parsed.data.level)
         return { ok: true }
       } catch (error) {
         reply.log.error(error)

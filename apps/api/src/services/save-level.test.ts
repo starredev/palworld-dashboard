@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseLevelSummary, parsePlayerStats } from './save-level'
+import { parseLevelSummary, parsePlayerStats, refuelPlayer, setPlayerLevel } from './save-level'
 
 // palworld-save-tools-shaped Level.sav CharacterSaveParameterMap entry.
 function entry(opts: {
@@ -81,6 +81,38 @@ describe('parsePlayerStats', () => {
       entry({ isPlayer: true, playerUid: 'deadbeef-0000-0000-0000-000000000000' }),
     ])
     expect(parsePlayerStats(json, MELVIN).found).toBe(false)
+  })
+})
+
+describe('refuelPlayer', () => {
+  it('sets hunger + sanity to full when present', () => {
+    const params: Record<string, unknown> = {
+      FullStomach: { value: 12, type: 'FloatProperty' },
+      SanityValue: { value: 30, type: 'FloatProperty' },
+    }
+    refuelPlayer(params)
+    expect((params.FullStomach as { value: number }).value).toBe(150)
+    expect((params.SanityValue as { value: number }).value).toBe(100)
+  })
+
+  it('is a no-op for fields the save omits (never throws)', () => {
+    const params: Record<string, unknown> = { FullStomach: { value: 5, type: 'FloatProperty' } }
+    expect(() => refuelPlayer(params)).not.toThrow()
+    expect((params.FullStomach as { value: number }).value).toBe(150)
+  })
+})
+
+describe('setPlayerLevel', () => {
+  it('sets the Level byte in place', () => {
+    const params: Record<string, unknown> = {
+      Level: { value: { value: 23, type: 'ByteProperty' }, type: 'ByteProperty' },
+    }
+    setPlayerLevel(params, 30)
+    expect((params.Level as { value: { value: number } }).value.value).toBe(30)
+  })
+
+  it('throws when the Level field is absent', () => {
+    expect(() => setPlayerLevel({}, 30)).toThrow(/Level/)
   })
 })
 
