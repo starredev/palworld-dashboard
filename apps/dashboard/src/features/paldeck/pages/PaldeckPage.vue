@@ -5,15 +5,9 @@ import { BookOpen, Loader2, PlugZap } from 'lucide-vue-next'
 import { api } from '@/lib/api'
 import { useSaveStatus } from '@/composables/use-save-editor'
 import PagePlaceholder from '@/components/common/PagePlaceholder.vue'
+import PalDetailDialog, { type PalEntry } from '../components/PalDetailDialog.vue'
 import data from '../pals.json'
 
-interface PalEntry {
-  dex: number
-  id: string
-  name: string
-  elements: string[]
-  rarity: number
-}
 const pals = data.pals as PalEntry[]
 const idToDex = data.idToDex as Record<string, number>
 
@@ -44,6 +38,15 @@ const ownedDex = computed<Set<number>>(() => {
   return set
 })
 const ownedCount = computed(() => pals.filter((p) => ownedDex.value.has(p.dex)).length)
+
+const selected = ref<PalEntry | null>(null)
+const selectedOwners = computed(() => {
+  if (!selected.value) return []
+  const dex = selected.value.dex
+  return owners.value
+    .filter((o) => o.species.some((s) => idToDex[s.toLowerCase()] === dex))
+    .map((o) => o.name ?? o.uid.slice(0, 8))
+})
 
 const broken = ref<Set<string>>(new Set())
 const icon = (id: string) => `https://palworld.gg/images/full_palicon/T_${id}_icon_normal.png`
@@ -114,8 +117,9 @@ const elemColor = (e?: string) => (e && ELEMENT_COLORS[e]) || '#71717a'
       <div
         v-for="pal in pals"
         :key="pal.dex"
-        class="rounded-xl border border-border bg-card p-2.5 text-center transition"
+        class="cursor-pointer rounded-xl border border-border bg-card p-2.5 text-center transition hover:border-primary/40 hover:bg-accent/30"
         :class="ownedDex.has(pal.dex) ? '' : 'opacity-40 grayscale'"
+        @click="selected = pal"
       >
         <div class="relative mx-auto grid size-14 place-items-center">
           <img
@@ -154,5 +158,7 @@ const elemColor = (e?: string) => (e && ELEMENT_COLORS[e]) || '#71717a'
         </div>
       </div>
     </div>
+
+    <PalDetailDialog :pal="selected" :owners="selectedOwners" @close="selected = null" />
   </section>
 </template>
