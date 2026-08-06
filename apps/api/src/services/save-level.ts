@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
+import { randomUUID } from 'node:crypto'
 import type { FastifyInstance } from 'fastify'
 import type {
   LevelSummary,
@@ -87,6 +88,7 @@ function isPlayerParams(params: Record<string, unknown>): boolean {
 function normUid(s: string): string {
   return s.replace(/[^0-9a-fA-F]/g, '').toLowerCase()
 }
+const hex = (s: unknown): string => (typeof s === 'string' ? normUid(s) : '')
 /** Match a save GUID to a player uid — full hex, or the leading 8 (the id part). */
 function uidMatches(guid: unknown, uid: string): boolean {
   if (typeof guid !== 'string') return false
@@ -449,6 +451,108 @@ export function editPalInLevel(
     if (!params) throw new Error('Pal not found in Level.sav')
     applyPalEdit(params, input)
   })
+}
+
+// ---- Clone / duplicate a pal (spawn a new record) ----
+
+const ZERO_GUID = '00000000-0000-0000-0000-000000000000'
+function setV(node: unknown, value: unknown): void {
+  if (isVN(node)) node.value = value
+}
+function arrOf(json: unknown, key: string): unknown[] {
+  const m = deepFind(json, key)
+  return isVN(m) && Array.isArray(m.value) ? m.value : []
+}
+
+/**
+ * Duplicate one of a player's pals into a free Pal-box slot: deep-clone the map
+ * entry (inherits owner/guild/struct layout, incl. correct CharacterID casing),
+ * give it a fresh InstanceId, register that id in the box container slot AND the
+ * guild handle list (all three ids must agree). Mutates `json` in place.
+ */
+export function clonePalMutate(
+  json: unknown,
+  uid: string,
+  sourceInstanceId: string,
+  level?: number,
+): void {
+  const target = sourceInstanceId.replace(/[^0-9a-fA-F]/g, '').toLowerCase()
+  const entries = arrOf(json, 'CharacterSaveParameterMap')
+  const source = entries.find((e) => {
+    const p = saveParam(e)
+    return (
+      p &&
+      !isPlayerParams(p) &&
+      uidMatches(dig(p, 'OwnerPlayerUId', 'value'), uid) &&
+      String(dig(e, 'key', 'InstanceId', 'value'))
+        .replace(/[^0-9a-fA-F]/g, '')
+        .toLowerCase() === target
+    )
+  })
+  if (!source) throw new Error('Source pal not found')
+
+  const clone: unknown = JSON.parse(JSON.stringify(source))
+  const newId = randomUUID()
+  setV(dig(clone, 'key', 'InstanceId'), newId)
+  setV(dig(clone, 'key', 'PlayerUId'), ZERO_GUID)
+
+  const cp = saveParam(clone)
+  if (!cp) throw new Error('Clone has no SaveParameter')
+  if (level !== undefined) ensureByte(cp, 'Level', level, ['Rank', 'Talent_HP', 'Talent_Shot'])
+
+  // Reserve a free Pal-box slot (container is the clone's SlotID.ContainerId).
+  const containerGuid = hex(dig(cp['SlotID'], 'value', 'ContainerId', 'value', 'ID', 'value'))
+  const container = arrOf(json, 'CharacterContainerSaveData').find(
+    (c) => hex(dig(c, 'key', 'ID', 'value')) === containerGuid,
+  )
+  const slots = dig(container, 'value', 'Slots', 'value', 'values')
+  if (!Array.isArray(slots) || slots.length === 0) throw new Error('Pal box container not found')
+  const slotNum = numVal(dig(container, 'value', 'SlotNum')) ?? slots.length + 1
+  const used = new Set(slots.map((s) => dig(s, 'SlotIndex', 'value')))
+  let free = -1
+  for (let i = 0; i < slotNum; i++)
+    if (!used.has(i)) {
+      free = i
+      break
+    }
+  if (free < 0) throw new Error('Pal box is full')
+  setV(dig(cp['SlotID'], 'value', 'SlotIndex'), free)
+
+  const newSlot: unknown = JSON.parse(JSON.stringify(slots[0]))
+  setV(dig(newSlot, 'SlotIndex'), free)
+  const sraw = dig(newSlot, 'RawData', 'value') as Record<string, unknown> | undefined
+  if (sraw && typeof sraw === 'object') {
+    sraw['instance_id'] = newId
+    sraw['player_uid'] = ZERO_GUID
+    sraw['permission_tribe_id'] = 0
+  }
+  slots.push(newSlot)
+
+  // Register the pal in its guild's handle list (group_id inherited from source).
+  const groupId = hex(dig(clone, 'value', 'RawData', 'value', 'group_id'))
+  const group = arrOf(json, 'GroupSaveDataMap').find(
+    (g) => hex(dig(g, 'key', 'value')) === groupId || hex(dig(g, 'key')) === groupId,
+  )
+  const handles = dig(group, 'value', 'RawData', 'value', 'individual_character_handle_ids')
+  if (Array.isArray(handles) && handles.length) {
+    const h: unknown = JSON.parse(JSON.stringify(handles[0]))
+    ;(h as Record<string, unknown>)['guid'] = ZERO_GUID
+    ;(h as Record<string, unknown>)['instance_id'] = newId
+    handles.push(h)
+  }
+
+  entries.push(clone)
+}
+
+export function clonePalInLevel(
+  app: FastifyInstance,
+  uid: string,
+  sourceInstanceId: string,
+  level?: number,
+): Promise<void> {
+  return editSaveFile(app, levelSavPath(), (json) =>
+    clonePalMutate(json, uid, sourceInstanceId, level),
+  )
 }
 
 /** Decode Level.sav and count players/pals — cheap validation of the decode path. */

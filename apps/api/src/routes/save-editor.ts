@@ -23,6 +23,7 @@ import { readPlayerLocation, teleportPlayer } from '../services/save-teleport'
 import { giveTechPoints, readPlayerDetail } from '../services/save-player-fields'
 import { giveItem, isInventoryAvailable, readInventory } from '../services/save-inventory'
 import {
+  clonePalInLevel,
   editPalInLevel,
   editPlayerStatsInLevel,
   isLevelAvailable,
@@ -277,6 +278,24 @@ export async function saveEditorRoutes(app: FastifyInstance): Promise<void> {
       }
       try {
         await setPlayerLevelInLevel(app, req.params.uid, parsed.data.level)
+        return { ok: true }
+      } catch (error) {
+        reply.log.error(error)
+        return reply.status(500).send({ message: (error as Error).message })
+      }
+    },
+  )
+
+  // Write (Level.sav): duplicate one of a player's pals into a free box slot.
+  app.post<{ Params: { uid: string; instanceId: string } }>(
+    '/save/players/:uid/pals/:instanceId/clone',
+    { preHandler: requireAdmin },
+    async (req, reply) => {
+      if (!isSaveEditAvailable() || !isLevelAvailable()) {
+        return reply.status(503).send({ message: 'Level.sav editing is not available' })
+      }
+      try {
+        await clonePalInLevel(app, req.params.uid, req.params.instanceId)
         return { ok: true }
       } catch (error) {
         reply.log.error(error)

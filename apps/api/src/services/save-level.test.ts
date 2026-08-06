@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   applyPalEdit,
+  clonePalMutate,
   ensureByte,
   parseLevelPlayers,
   parseLevelSummary,
@@ -220,6 +221,108 @@ describe('setPlayerStats', () => {
     ).value.values
     expect(list[0].StatusPoint.value).toBe(10) // 最大HP
     expect(list[1].StatusPoint.value).toBe(5) // 攻撃力
+  })
+})
+
+describe('clonePalMutate', () => {
+  const BOX = 'bbbb2222-0000-0000-0000-000000000000'
+  const GROUP = 'cccc3333-0000-0000-0000-000000000000'
+  const INST = 'dddd4444-0000-0000-0000-000000000000'
+
+  function world() {
+    return {
+      properties: {
+        worldSaveData: {
+          value: {
+            CharacterSaveParameterMap: {
+              value: [
+                {
+                  key: { InstanceId: { value: INST }, PlayerUId: { value: '00000000' } },
+                  value: {
+                    RawData: {
+                      value: {
+                        object: {
+                          SaveParameter: {
+                            value: {
+                              CharacterID: { value: 'SheepBall' },
+                              OwnerPlayerUId: { value: MELVIN_GUID, struct_type: 'Guid' },
+                              SlotID: {
+                                value: {
+                                  ContainerId: { value: { ID: { value: BOX } } },
+                                  SlotIndex: { value: 0 },
+                                },
+                              },
+                            },
+                          },
+                        },
+                        group_id: GROUP,
+                      },
+                    },
+                  },
+                },
+              ],
+            },
+            CharacterContainerSaveData: {
+              value: [
+                {
+                  key: { ID: { value: BOX } },
+                  value: {
+                    SlotNum: { value: 30 },
+                    Slots: {
+                      value: {
+                        values: [
+                          {
+                            SlotIndex: { value: 0 },
+                            RawData: {
+                              value: { player_uid: '0', instance_id: INST, permission_tribe_id: 0 },
+                            },
+                          },
+                        ],
+                      },
+                    },
+                  },
+                },
+              ],
+            },
+            GroupSaveDataMap: {
+              value: [
+                {
+                  key: { value: GROUP },
+                  value: {
+                    RawData: {
+                      value: {
+                        individual_character_handle_ids: [{ guid: '0', instance_id: INST }],
+                      },
+                    },
+                  },
+                },
+              ],
+            },
+          },
+        },
+      },
+    }
+  }
+
+  it('adds a pal entry, a box slot, and a guild handle — all with a new matching id', () => {
+    const json = world()
+    clonePalMutate(json, MELVIN, INST)
+    const w = json.properties.worldSaveData.value
+    const chars = w.CharacterSaveParameterMap.value
+    expect(chars).toHaveLength(2)
+    const newId = chars[1].key.InstanceId.value as string
+    expect(newId).not.toBe(INST)
+    const slots = w.CharacterContainerSaveData.value[0].value.Slots.value.values
+    expect(slots).toHaveLength(2)
+    expect(slots[1].SlotIndex.value).toBe(1)
+    expect(slots[1].RawData.value.instance_id).toBe(newId)
+    const handles = w.GroupSaveDataMap.value[0].value.RawData.value.individual_character_handle_ids
+    expect(handles).toHaveLength(2)
+    expect(handles[1].instance_id).toBe(newId)
+  })
+
+  it('throws when the source pal is not found', () => {
+    expect(() => clonePalMutate(world(), MELVIN, 'ffffffff')).toThrow(/not found/i)
   })
 })
 

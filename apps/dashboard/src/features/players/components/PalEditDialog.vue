@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useMutation } from '@tanstack/vue-query'
-import { X, TriangleAlert, HeartPulse } from 'lucide-vue-next'
+import { X, TriangleAlert, HeartPulse, Copy } from 'lucide-vue-next'
 import { Button, Input, ConfirmDialog } from '@tsuki/ui'
 import type { PalSummary } from '@tsuki/types'
 import { api } from '@/lib/api'
@@ -51,6 +51,16 @@ const edit = useMutation({
 })
 
 const canApply = computed(() => !!props.pal?.instanceId && !!props.uid)
+
+const cloning = ref(false)
+const clone = useMutation({
+  mutationFn: () => api.clonePal(props.uid!, props.pal!.instanceId!),
+  onSuccess: () => {
+    cloning.value = false
+    emit('done')
+    emit('close')
+  },
+})
 </script>
 
 <template>
@@ -108,16 +118,26 @@ const canApply = computed(() => !!props.pal?.instanceId && !!props.uid)
             {{ (edit.error.value as Error)?.message ?? 'Edit failed.' }}
           </p>
 
-          <div class="mt-6 flex justify-end gap-2">
-            <Button variant="outline" size="sm" @click="emit('close')">Cancel</Button>
+          <div class="mt-6 flex items-center justify-between gap-2">
             <Button
-              variant="destructive"
+              variant="outline"
               size="sm"
-              :disabled="!canApply || edit.isPending.value"
-              @click="confirming = true"
+              :disabled="!canApply || clone.isPending.value"
+              @click="cloning = true"
             >
-              Apply &amp; restart
+              <Copy /> Duplicate
             </Button>
+            <div class="flex gap-2">
+              <Button variant="outline" size="sm" @click="emit('close')">Cancel</Button>
+              <Button
+                variant="destructive"
+                size="sm"
+                :disabled="!canApply || edit.isPending.value"
+                @click="confirming = true"
+              >
+                Apply &amp; restart
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -133,6 +153,17 @@ const canApply = computed(() => !!props.pal?.instanceId && !!props.uid)
     :loading="edit.isPending.value"
     @update:open="(v: boolean) => !v && (confirming = false)"
     @confirm="edit.mutate()"
+  />
+
+  <ConfirmDialog
+    :open="cloning"
+    title="Duplicate this pal and restart?"
+    :description="`A copy of ${title} will be added to the player's Pal box. The server restarts and everyone disconnects briefly.`"
+    tone="destructive"
+    confirm-label="Duplicate & restart"
+    :loading="clone.isPending.value"
+    @update:open="(v: boolean) => !v && (cloning = false)"
+    @confirm="clone.mutate()"
   />
 </template>
 
