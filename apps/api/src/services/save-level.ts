@@ -1,7 +1,13 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import type { FastifyInstance } from 'fastify'
-import type { LevelSummary, PaldeckOwner, PlayerStats, SavePlayer } from '@tsuki/types'
+import type {
+  LevelSummary,
+  PaldeckOwner,
+  PalEditInput,
+  PlayerStats,
+  SavePlayer,
+} from '@tsuki/types'
 import { readSaveJson, isSaveEditorAvailable } from './save-editor'
 import { editSaveFile } from './save-edit'
 import { deepFind } from './save-location'
@@ -118,11 +124,18 @@ export function parsePlayerStats(levelJson: unknown, uid: string): Omit<PlayerSt
         }
       }
     } else if (uidMatches(dig(params['OwnerPlayerUId'], 'value'), uid)) {
+      const inst = dig(entry, 'key', 'InstanceId', 'value')
+      const rare = params['IsRarePal']
       pals.push({
         species: strVal(params['CharacterID']) ?? 'Unknown',
         nickname: strVal(params['NickName']),
         level: byteVal(params['Level']) ?? 1,
         gender: enumVal(params['Gender'])?.split('::').pop() ?? null,
+        instanceId: typeof inst === 'string' ? inst : null,
+        talentHp: byteVal(params['Talent_HP']),
+        talentShot: byteVal(params['Talent_Shot']),
+        talentDefense: byteVal(params['Talent_Defense']),
+        lucky: isVN(rare) && rare.value === true,
       })
     }
   }
@@ -263,6 +276,93 @@ export function setPlayerLevelInLevel(
   level: number,
 ): Promise<void> {
   return editPlayerInLevel(app, uid, (params) => setPlayerLevel(params, level))
+}
+
+// ---- Pal edits (Level.sav) ----
+
+/**
+ * Set a ByteProperty's value. If the key is absent (the game drops some fields,
+ * e.g. Level on a level-1 pal), deep-clone a sibling ByteProperty and overwrite
+ * its value — this avoids hardcoding the exact struct shape.
+ */
+export function ensureByte(
+  params: Record<string, unknown>,
+  key: string,
+  value: number,
+  siblings: string[],
+): void {
+  const node = params[key]
+  if (isVN(node) && isVN(node.value)) {
+    node.value.value = value
+    return
+  }
+  for (const s of siblings) {
+    const sib = params[s]
+    if (isVN(sib) && isVN(sib.value)) {
+      const clone = JSON.parse(JSON.stringify(sib)) as { value: { value: number } }
+      clone.value.value = value
+      params[key] = clone
+      return
+    }
+  }
+  throw new Error(`Cannot set ${key}: no sibling ByteProperty to clone from`)
+}
+
+/** Fully heal a pal: top HP/hunger/sanity and clear sickness/revive timers. */
+function healPal(params: Record<string, unknown>): void {
+  const hp = dig(params['Hp'] ?? params['HP'], 'value', 'Value')
+  if (isVN(hp)) hp.value = 100_000_000
+  const fs = params['FullStomach']
+  if (isVN(fs)) fs.value = 500
+  const san = params['SanityValue']
+  if (isVN(san)) san.value = 100
+  for (const k of ['PalReviveTimer', 'WorkerSick', 'PhysicalHealth', 'HungerType']) delete params[k]
+}
+
+/** Apply an edit to a pal's SaveParameter in place. */
+export function applyPalEdit(params: Record<string, unknown>, input: PalEditInput): void {
+  if (input.level !== undefined)
+    ensureByte(params, 'Level', input.level, ['Rank', 'Talent_HP', 'Talent_Shot', 'Talent_Defense'])
+  if (input.talentHp !== undefined)
+    ensureByte(params, 'Talent_HP', input.talentHp, ['Talent_Shot', 'Talent_Defense'])
+  if (input.talentShot !== undefined)
+    ensureByte(params, 'Talent_Shot', input.talentShot, ['Talent_HP', 'Talent_Defense'])
+  if (input.talentDefense !== undefined)
+    ensureByte(params, 'Talent_Defense', input.talentDefense, ['Talent_HP', 'Talent_Shot'])
+  if (input.heal) healPal(params)
+}
+
+const hexOnly = (s: string) => s.replace(/[^0-9a-fA-F]/g, '').toLowerCase()
+
+/** Find a specific pal by owner uid + its InstanceId (a ref into json). */
+function findPalRef(
+  levelJson: unknown,
+  uid: string,
+  instanceId: string,
+): Record<string, unknown> | null {
+  const target = hexOnly(instanceId)
+  for (const entry of characterEntries(levelJson)) {
+    const params = saveParam(entry)
+    if (!params || isPlayerParams(params)) continue
+    if (!uidMatches(dig(params['OwnerPlayerUId'], 'value'), uid)) continue
+    const inst = dig(entry, 'key', 'InstanceId', 'value')
+    if (typeof inst === 'string' && hexOnly(inst) === target) return params
+  }
+  return null
+}
+
+/** Edit one of a player's pals via the safe pipeline. */
+export function editPalInLevel(
+  app: FastifyInstance,
+  uid: string,
+  instanceId: string,
+  input: PalEditInput,
+): Promise<void> {
+  return editSaveFile(app, levelSavPath(), (json) => {
+    const params = findPalRef(json, uid, instanceId)
+    if (!params) throw new Error('Pal not found in Level.sav')
+    applyPalEdit(params, input)
+  })
 }
 
 /** Decode Level.sav and count players/pals — cheap validation of the decode path. */

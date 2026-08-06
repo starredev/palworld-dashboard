@@ -62,6 +62,7 @@ import {
   type PlayerStats,
   type SavePlayersResponse,
   type PaldeckResponse,
+  type PalEditInput,
   type Vec3,
 } from '@tsuki/types'
 import { apiFetch, apiUrl } from './http'
@@ -316,5 +317,12 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ level }),
     }) as Promise<{ ok: boolean }>
+  },
+
+  editPal(uid: string, instanceId: string, input: PalEditInput): Promise<{ ok: boolean }> {
+    return apiFetch(
+      `/save/players/${encodeURIComponent(uid)}/pals/${encodeURIComponent(instanceId)}`,
+      { method: 'POST', body: JSON.stringify(input) },
+    ) as Promise<{ ok: boolean }>
   },
 }

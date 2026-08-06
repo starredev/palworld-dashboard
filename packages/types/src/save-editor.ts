@@ -50,8 +50,28 @@ export const palSummarySchema = z.object({
   nickname: z.string().nullable(),
   level: z.number(),
   gender: z.string().nullable(),
+  /** GUID that identifies this exact pal — needed to target it for edits. */
+  instanceId: z.string().nullable(),
+  talentHp: z.number().nullable(),
+  talentShot: z.number().nullable(),
+  talentDefense: z.number().nullable(),
+  lucky: z.boolean(),
 })
 export type PalSummary = z.infer<typeof palSummarySchema>
+
+/** Edit one pal (all fields optional; at least one required). */
+export const palEditInputSchema = z
+  .object({
+    level: z.number().int().min(1).max(100).optional(),
+    talentHp: z.number().int().min(0).max(100).optional(),
+    talentShot: z.number().int().min(0).max(100).optional(),
+    talentDefense: z.number().int().min(0).max(100).optional(),
+    heal: z.boolean().optional(),
+  })
+  .refine((v) => Object.values(v).some((x) => x !== undefined), {
+    message: 'Nothing to change',
+  })
+export type PalEditInput = z.infer<typeof palEditInputSchema>
 
 /**
  * A player's in-world stats + owned pals, from Level.sav's

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
+  applyPalEdit,
+  ensureByte,
   parseLevelPlayers,
   parseLevelSummary,
   parsePaldeck,
@@ -140,6 +142,56 @@ describe('parseLevelPlayers', () => {
       { uid: 'A87A257D000000000000000000000000', name: 'Invisiouz', level: 24 }, // sorted by level desc
       { uid: MELVIN, name: 'Melvin265', level: 23 },
     ])
+  })
+})
+
+const byteNode = (v: number) => ({ value: { value: v, type: 'None' }, type: 'ByteProperty' })
+
+describe('ensureByte', () => {
+  it('sets an existing ByteProperty in place', () => {
+    const params: Record<string, unknown> = { Level: byteNode(5) }
+    ensureByte(params, 'Level', 40, ['Rank'])
+    expect((params.Level as { value: { value: number } }).value.value).toBe(40)
+  })
+
+  it('clones a sibling to create an absent field (e.g. Level on a lvl-1 pal)', () => {
+    const params: Record<string, unknown> = { Talent_HP: byteNode(70) }
+    ensureByte(params, 'Level', 25, ['Talent_HP'])
+    expect((params.Level as { value: { value: number }; type: string }).value.value).toBe(25)
+    expect((params.Level as { type: string }).type).toBe('ByteProperty') // shape cloned
+    expect((params.Talent_HP as { value: { value: number } }).value.value).toBe(70) // sibling intact
+  })
+
+  it('throws when there is no sibling ByteProperty to clone', () => {
+    expect(() => ensureByte({}, 'Level', 10, ['Rank'])).toThrow(/clone/)
+  })
+})
+
+describe('applyPalEdit', () => {
+  it('applies level + talents together', () => {
+    const params: Record<string, unknown> = {
+      Level: byteNode(10),
+      Talent_HP: byteNode(0),
+      Talent_Shot: byteNode(0),
+      Talent_Defense: byteNode(0),
+    }
+    applyPalEdit(params, { level: 50, talentHp: 100, talentShot: 90, talentDefense: 80 })
+    expect((params.Level as { value: { value: number } }).value.value).toBe(50)
+    expect((params.Talent_HP as { value: { value: number } }).value.value).toBe(100)
+    expect((params.Talent_Shot as { value: { value: number } }).value.value).toBe(90)
+    expect((params.Talent_Defense as { value: { value: number } }).value.value).toBe(80)
+  })
+
+  it('heals: clears sickness/revive and tops sanity', () => {
+    const params: Record<string, unknown> = {
+      SanityValue: { value: 20, type: 'FloatProperty' },
+      WorkerSick: { value: 'x' },
+      PalReviveTimer: { value: 1 },
+    }
+    applyPalEdit(params, { heal: true })
+    expect((params.SanityValue as { value: number }).value).toBe(100)
+    expect(params.WorkerSick).toBeUndefined()
+    expect(params.PalReviveTimer).toBeUndefined()
   })
 })
 

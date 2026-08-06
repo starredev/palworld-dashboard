@@ -3,10 +3,16 @@ import { computed, ref, watch } from 'vue'
 import { useMutation } from '@tanstack/vue-query'
 import { Loader2, Database, Utensils, ArrowUpNarrowWide } from 'lucide-vue-next'
 import { Button, Input, ConfirmDialog } from '@tsuki/ui'
-import type { PalPlayer, PlayerStats } from '@tsuki/types'
+import type { PalPlayer, PalSummary, PlayerStats } from '@tsuki/types'
 import { api } from '@/lib/api'
+import PalEditDialog from './PalEditDialog.vue'
 
 const props = defineProps<{ player: PalPlayer | null; canEdit?: boolean }>()
+
+const editingPal = ref<PalSummary | null>(null)
+function openPal(pal: PalSummary): void {
+  if (props.canEdit && pal.instanceId) editingPal.value = pal
+}
 
 const stats = ref<PlayerStats | null>(null)
 const loading = ref(false)
@@ -104,12 +110,17 @@ const rows = computed(() => {
 
         <!-- Pals -->
         <div class="mt-4">
-          <p class="mb-1.5 text-xs text-muted-foreground">Pals · {{ stats.pals.length }}</p>
+          <p class="mb-1.5 text-xs text-muted-foreground">
+            Pals · {{ stats.pals.length }}
+            <span v-if="canEdit" class="text-muted-foreground/60">· click to edit</span>
+          </p>
           <div class="max-h-40 space-y-1 overflow-y-auto pr-1">
             <div
               v-for="(pal, i) in stats.pals"
               :key="i"
               class="flex items-center justify-between rounded-md bg-muted/30 px-2.5 py-1.5 text-xs"
+              :class="canEdit && pal.instanceId ? 'cursor-pointer hover:bg-muted/60' : ''"
+              @click="openPal(pal)"
             >
               <span class="truncate">
                 <span v-if="pal.species.startsWith('BOSS_')" class="mr-1 text-amber-400">★</span>
@@ -149,6 +160,13 @@ const rows = computed(() => {
       :loading="write.isPending.value"
       @update:open="(v: boolean) => !v && (pending = null)"
       @confirm="write.mutate()"
+    />
+
+    <PalEditDialog
+      :pal="editingPal"
+      :uid="player?.playerId ?? null"
+      @close="editingPal = null"
+      @done="load"
     />
   </div>
 </template>
