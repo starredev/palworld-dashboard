@@ -34,6 +34,12 @@ const routes: RouteRecordRaw[] = [
       },
       { path: 'paldeck', redirect: { path: '/pals', query: { tab: 'paldeck' } } },
       {
+        path: 'crafting',
+        name: 'crafting',
+        component: () => import('@/features/crafting/pages/CraftingPage.vue'),
+        meta: { title: 'Crafting' },
+      },
+      {
         path: 'map',
         name: 'map',
         component: () => import('@/features/map/pages/MapPage.vue'),
