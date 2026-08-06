@@ -66,6 +66,56 @@ const wildMatchCount = computed(() =>
     : 0,
 )
 
+// Circle the area(s) where the selected species is — cluster nearby wild pals
+// and cover each cluster with a padded circle (world units).
+const worldSpan = computed(() => {
+  const b = mapBounds.value
+  return b && b.length === 4
+    ? Math.max(Math.abs(b[2] - b[0]), Math.abs(b[3] - b[1])) || 1_448_800
+    : 1_448_800
+})
+function clusterAreas(pts: { x: number; y: number }[]): { x: number; y: number; r: number }[] {
+  const span = worldSpan.value
+  const threshold = span * 0.12
+  const pad = span * 0.05
+  const minR = span * 0.03
+  const clusters: { sx: number; sy: number; n: number; pts: { x: number; y: number }[] }[] = []
+  for (const p of pts) {
+    let best: (typeof clusters)[number] | null = null
+    let bestD = Infinity
+    for (const c of clusters) {
+      const d = Math.hypot(p.x - c.sx / c.n, p.y - c.sy / c.n)
+      if (d < bestD) {
+        bestD = d
+        best = c
+      }
+    }
+    if (best && bestD < threshold) {
+      best.sx += p.x
+      best.sy += p.y
+      best.n++
+      best.pts.push(p)
+    } else {
+      clusters.push({ sx: p.x, sy: p.y, n: 1, pts: [p] })
+    }
+  }
+  return clusters.map((c) => {
+    const cx = c.sx / c.n
+    const cy = c.sy / c.n
+    const r = Math.max(...c.pts.map((p) => Math.hypot(p.x - cx, p.y - cy)), minR) + pad
+    return { x: cx, y: cy, r }
+  })
+}
+const speciesAreas = computed(() =>
+  species.value
+    ? clusterAreas(
+        points.value
+          .filter((p) => p.kind === 'wild' && speciesMatch(p.detail))
+          .map((p) => ({ x: p.x, y: p.y })),
+      )
+    : [],
+)
+
 const liveMapUrl = computed(() => {
   if (config.data.value?.liveMapUrl) return config.data.value.liveMapUrl
   const { protocol, hostname } = window.location
@@ -173,6 +223,7 @@ function count(kind: MapPointKind): number {
           :visible="visible"
           :image-url="mapImageUrl"
           :bounds="mapBounds"
+          :areas="speciesAreas"
         />
       </Card>
     </template>

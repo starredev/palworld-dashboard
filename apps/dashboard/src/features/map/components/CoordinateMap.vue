@@ -9,6 +9,8 @@ const props = defineProps<{
   imageUrl?: string | null
   /** World bounds of the image: [xTopLeft, yTopLeft, xBottomRight, yBottomRight]. */
   bounds?: [number, number, number, number]
+  /** Translucent world-space circles (e.g. species habitat areas), in world units. */
+  areas?: { x: number; y: number; r: number }[]
 }>()
 
 const SIZE = 1000
@@ -68,6 +70,33 @@ const projected = computed(() => {
   }))
 })
 
+/** Project world-space area circles into the same 0..1 space as the points. */
+const areaCircles = computed(() => {
+  const areas = props.areas ?? []
+  if (!areas.length) return []
+  if (props.imageUrl && props.bounds) {
+    const [xTL, yTL, xBR, yBR] = props.bounds
+    const span = Math.max(Math.abs(xBR - xTL), Math.abs(yBR - yTL)) || 1
+    return areas.map((a) => ({
+      ncx: (a.x - xTL) / (xBR - xTL),
+      ncy: (a.y - yTL) / (yBR - yTL),
+      nr: a.r / span,
+    }))
+  }
+  const b = autoBounds.value
+  if (!b) return []
+  const rangeX = Math.max(b.maxX - b.minX, 1)
+  const rangeY = Math.max(b.maxY - b.minY, 1)
+  const scale = (SIZE - PAD * 2) / Math.max(rangeX, rangeY)
+  const offX = (SIZE - rangeX * scale) / 2
+  const offY = (SIZE - rangeY * scale) / 2
+  return areas.map((a) => ({
+    ncx: (offX + (a.x - b.minX) * scale) / SIZE,
+    ncy: (SIZE - (offY + (a.y - b.minY) * scale)) / SIZE,
+    nr: (a.r * scale) / SIZE,
+  }))
+})
+
 // ---- pan / zoom via GPU-composited CSS transform ----
 const wrapperRef = ref<HTMLElement>()
 const size = ref(1)
@@ -86,6 +115,15 @@ const markers = computed(() =>
     ...p,
     left: view.tx + p.nx * size.value * view.k,
     top: view.ty + p.ny * size.value * view.k,
+  })),
+)
+
+// Area circles scale WITH the map (they cover a world region), unlike markers.
+const areaMarkers = computed(() =>
+  areaCircles.value.map((c) => ({
+    left: view.tx + c.ncx * size.value * view.k,
+    top: view.ty + c.ncy * size.value * view.k,
+    d: c.nr * 2 * size.value * view.k,
   })),
 )
 
@@ -202,6 +240,23 @@ onBeforeUnmount(() => ro?.disconnect())
             linear-gradient(to bottom, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
           background-size: 5% 5%;
         "
+      />
+    </div>
+
+    <!-- Species habitat circles (scale with the map) -->
+    <div class="pointer-events-none absolute inset-0">
+      <div
+        v-for="(a, i) in areaMarkers"
+        :key="`area-${i}`"
+        class="absolute -translate-x-1/2 -translate-y-1/2 rounded-full"
+        :style="{
+          left: `${a.left}px`,
+          top: `${a.top}px`,
+          width: `${a.d}px`,
+          height: `${a.d}px`,
+          background: 'rgba(251,191,36,0.12)',
+          border: '1.5px solid rgba(251,191,36,0.55)',
+        }"
       />
     </div>
 
