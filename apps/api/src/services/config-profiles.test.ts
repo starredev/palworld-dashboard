@@ -34,11 +34,30 @@ describe('eventStatus', () => {
       name: 'Weekend',
       profileId: p.id,
       revertProfileId: p.id,
+      recurrence: 'once',
       startsAt: '2026-08-08T18:00:00.000Z',
       endsAt: '2026-08-11T09:00:00.000Z',
     })
     expect(eventStatus(event, new Date('2026-08-07T00:00:00Z'))).toBe('upcoming')
     expect(eventStatus(event, new Date('2026-08-09T00:00:00Z'))).toBe('active')
     expect(eventStatus(event, new Date('2026-08-12T00:00:00Z'))).toBe('done')
+  })
+
+  it('classifies a weekly window (wrapping the week)', () => {
+    const p = upsertProfile({ name: 'Base', body: 'ExpRate=1.000000', announce: '' })
+    // Fri 18:00 → Mon 06:00 (wraps Sun→Mon)
+    const event = createEvent({
+      name: 'Weekend',
+      profileId: p.id,
+      revertProfileId: p.id,
+      recurrence: 'weekly',
+      startDay: 5,
+      startTime: '18:00',
+      endDay: 1,
+      endTime: '06:00',
+    })
+    // Sat noon = inside; Wed noon = outside
+    expect(eventStatus(event, new Date(2026, 7, 8, 12, 0))).toBe('active') // Sat
+    expect(eventStatus(event, new Date(2026, 7, 12, 12, 0))).toBe('upcoming') // Wed
   })
 })

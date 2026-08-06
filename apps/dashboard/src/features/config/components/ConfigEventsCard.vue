@@ -10,7 +10,21 @@ const profiles = computed(() => query.data.value?.profiles ?? [])
 const events = computed(() => query.data.value?.events ?? [])
 const nameById = computed(() => new Map(profiles.value.map((p) => [p.id, p.name])))
 
-const form = ref({ name: '', profileId: '', revertProfileId: '', startsAt: '', endsAt: '' })
+const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+const blank = () => ({
+  name: '',
+  profileId: '',
+  revertProfileId: '',
+  recurrence: 'once' as 'once' | 'weekly',
+  startsAt: '',
+  endsAt: '',
+  startDay: 5,
+  startTime: '18:00',
+  endDay: 1,
+  endTime: '06:00',
+})
+const form = ref(blank())
 const error = ref('')
 
 function toIso(local: string): string {
@@ -20,26 +34,41 @@ function toIso(local: string): string {
 function onCreate(): void {
   error.value = ''
   const f = form.value
-  if (!f.name.trim() || !f.profileId || !f.revertProfileId || !f.startsAt || !f.endsAt) {
+  if (!f.name.trim() || !f.profileId || !f.revertProfileId) {
     error.value = 'Fill in every field.'
     return
   }
-  if (new Date(f.endsAt) <= new Date(f.startsAt)) {
-    error.value = 'The end time must be after the start time.'
-    return
+  if (f.recurrence === 'once') {
+    if (!f.startsAt || !f.endsAt) {
+      error.value = 'Pick a start and end time.'
+      return
+    }
+    if (new Date(f.endsAt) <= new Date(f.startsAt)) {
+      error.value = 'The end time must be after the start time.'
+      return
+    }
   }
   createEvent.mutate(
-    {
-      name: f.name.trim(),
-      profileId: f.profileId,
-      revertProfileId: f.revertProfileId,
-      startsAt: toIso(f.startsAt),
-      endsAt: toIso(f.endsAt),
-    },
-    {
-      onSuccess: () =>
-        (form.value = { name: '', profileId: '', revertProfileId: '', startsAt: '', endsAt: '' }),
-    },
+    f.recurrence === 'weekly'
+      ? {
+          name: f.name.trim(),
+          profileId: f.profileId,
+          revertProfileId: f.revertProfileId,
+          recurrence: 'weekly',
+          startDay: f.startDay,
+          startTime: f.startTime,
+          endDay: f.endDay,
+          endTime: f.endTime,
+        }
+      : {
+          name: f.name.trim(),
+          profileId: f.profileId,
+          revertProfileId: f.revertProfileId,
+          recurrence: 'once',
+          startsAt: toIso(f.startsAt),
+          endsAt: toIso(f.endsAt),
+        },
+    { onSuccess: () => (form.value = blank()) },
   )
 }
 
@@ -50,6 +79,20 @@ function fmt(iso: string): string {
     hour: '2-digit',
     minute: '2-digit',
   })
+}
+function fmtEvent(e: {
+  recurrence: 'once' | 'weekly'
+  startsAt: string | null
+  endsAt: string | null
+  startDay: number | null
+  startTime: string | null
+  endDay: number | null
+  endTime: string | null
+}): string {
+  if (e.recurrence === 'weekly' && e.startDay != null && e.endDay != null) {
+    return `Weekly · ${DAYS[e.startDay]} ${e.startTime} → ${DAYS[e.endDay]} ${e.endTime}`
+  }
+  return e.startsAt && e.endsAt ? `${fmt(e.startsAt)} – ${fmt(e.endsAt)}` : ''
 }
 
 const STATUS = {
@@ -104,13 +147,48 @@ const selectClass =
               </select>
             </label>
             <label class="space-y-1 text-xs text-muted-foreground">
-              Starts
-              <Input v-model="form.startsAt" type="datetime-local" />
+              Repeat
+              <select v-model="form.recurrence" :class="selectClass">
+                <option value="once" class="bg-card">Once</option>
+                <option value="weekly" class="bg-card">Every week</option>
+              </select>
             </label>
-            <label class="space-y-1 text-xs text-muted-foreground">
-              Ends
-              <Input v-model="form.endsAt" type="datetime-local" />
-            </label>
+            <span class="hidden sm:block" />
+
+            <template v-if="form.recurrence === 'once'">
+              <label class="space-y-1 text-xs text-muted-foreground">
+                Starts
+                <Input v-model="form.startsAt" type="datetime-local" />
+              </label>
+              <label class="space-y-1 text-xs text-muted-foreground">
+                Ends
+                <Input v-model="form.endsAt" type="datetime-local" />
+              </label>
+            </template>
+            <template v-else>
+              <div class="space-y-1 text-xs text-muted-foreground">
+                Starts
+                <div class="flex gap-2">
+                  <select v-model.number="form.startDay" :class="selectClass">
+                    <option v-for="(d, i) in DAYS" :key="i" :value="i" class="bg-card">
+                      {{ d }}
+                    </option>
+                  </select>
+                  <Input v-model="form.startTime" type="time" class="w-28" />
+                </div>
+              </div>
+              <div class="space-y-1 text-xs text-muted-foreground">
+                Ends
+                <div class="flex gap-2">
+                  <select v-model.number="form.endDay" :class="selectClass">
+                    <option v-for="(d, i) in DAYS" :key="i" :value="i" class="bg-card">
+                      {{ d }}
+                    </option>
+                  </select>
+                  <Input v-model="form.endTime" type="time" class="w-28" />
+                </div>
+              </div>
+            </template>
           </div>
           <div class="flex items-center gap-3">
             <Button :disabled="createEvent.isPending.value" @click="onCreate">
@@ -138,9 +216,7 @@ const selectClass =
                 {{ nameById.get(event.profileId) ?? '—' }}
                 <ArrowRight class="size-3" />
                 {{ nameById.get(event.revertProfileId) ?? '—' }}
-                <span class="text-muted-foreground/60"
-                  >· {{ fmt(event.startsAt) }} – {{ fmt(event.endsAt) }}</span
-                >
+                <span class="text-muted-foreground/60">· {{ fmtEvent(event) }}</span>
               </p>
             </div>
             <Button
