@@ -84,29 +84,67 @@ export type ConfigProfile = z.infer<typeof configProfileSchema>
 export const configProfileInputSchema = configProfileSchema.omit({ id: true })
 export type ConfigProfileInput = z.infer<typeof configProfileInputSchema>
 
+const hhmm = z
+  .string()
+  .regex(/^\d{2}:\d{2}$/)
+  .nullable()
+  .default(null)
+const dayIdx = z.number().int().min(0).max(6).nullable().default(null) // 0 = Sunday
+
 /**
- * A scheduled event: activate `profileId` at `startsAt`, then revert to
- * `revertProfileId` at `endsAt`. Both transitions force-restart + announce.
+ * A scheduled event: activate `profileId`, then revert to `revertProfileId`.
+ * `once` uses fixed start/end datetimes; `weekly` recurs every week within a
+ * day+time window (which may wrap the week, e.g. Fri 18:00 → Mon 06:00). Both
+ * transitions force-restart + announce.
  */
 export const configEventSchema = z.object({
   id: z.string(),
   name: z.string().min(1).max(60),
   profileId: z.string(),
   revertProfileId: z.string(),
-  startsAt: z.string().datetime(),
-  endsAt: z.string().datetime(),
+  recurrence: z.enum(['once', 'weekly']).default('once'),
+  // once
+  startsAt: z.string().datetime().nullable().default(null),
+  endsAt: z.string().datetime().nullable().default(null),
   activated: z.boolean().default(false),
   reverted: z.boolean().default(false),
+  // weekly
+  startDay: dayIdx,
+  startTime: hhmm,
+  endDay: dayIdx,
+  endTime: hhmm,
+  active: z.boolean().default(false), // weekly: currently inside its window
 })
 export type ConfigEvent = z.infer<typeof configEventSchema>
 
-export const configEventInputSchema = configEventSchema.pick({
-  name: true,
-  profileId: true,
-  revertProfileId: true,
-  startsAt: true,
-  endsAt: true,
-})
+export const configEventInputSchema = z
+  .object({
+    name: z.string().min(1).max(60),
+    profileId: z.string(),
+    revertProfileId: z.string(),
+    recurrence: z.enum(['once', 'weekly']).default('once'),
+    startsAt: z.string().datetime().nullable().optional(),
+    endsAt: z.string().datetime().nullable().optional(),
+    startDay: z.number().int().min(0).max(6).nullable().optional(),
+    startTime: z
+      .string()
+      .regex(/^\d{2}:\d{2}$/)
+      .nullable()
+      .optional(),
+    endDay: z.number().int().min(0).max(6).nullable().optional(),
+    endTime: z
+      .string()
+      .regex(/^\d{2}:\d{2}$/)
+      .nullable()
+      .optional(),
+  })
+  .refine(
+    (v) =>
+      v.recurrence === 'weekly'
+        ? v.startDay != null && !!v.startTime && v.endDay != null && !!v.endTime
+        : !!v.startsAt && !!v.endsAt,
+    { message: 'Fill in the schedule fields' },
+  )
 export type ConfigEventInput = z.infer<typeof configEventInputSchema>
 
 /** Event with a derived lifecycle status, for display. */

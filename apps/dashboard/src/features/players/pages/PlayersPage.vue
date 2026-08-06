@@ -8,10 +8,13 @@ import { api } from '@/lib/api'
 import { useServerStatus } from '@/composables/use-server'
 import { usePlayers } from '@/composables/use-players'
 import { useServerCommands } from '@/composables/use-commands'
+import { useSaveStatus } from '@/composables/use-save-editor'
+import { useAuthStore } from '@/stores/auth'
 import PagePlaceholder from '@/components/common/PagePlaceholder.vue'
 import PlayerTable, { type SortKey } from '../components/PlayerTable.vue'
 import OfflinePlayersTable from '../components/OfflinePlayersTable.vue'
 import PlayerDetailDialog from '../components/PlayerDetailDialog.vue'
+import TeleportDialog from '../components/TeleportDialog.vue'
 
 const status = useServerStatus()
 const statusData = computed(() => status.data.value)
@@ -66,6 +69,36 @@ const roster = useQuery({
 const offlinePlayers = computed(() => (roster.data.value?.players ?? []).filter((p) => !p.online))
 
 const selected = ref<PalPlayer | null>(null)
+const teleporting = ref<PalPlayer | null>(null)
+
+const auth = useAuthStore()
+const saveStatus = useSaveStatus()
+const canTeleport = computed(() => auth.isAdmin && saveStatus.data.value?.canWrite === true)
+const saveAvailable = computed(() => auth.isAdmin && saveStatus.data.value?.available === true)
+
+// All players straight from the save (online or not) → gives offline players the
+// save uid the live roster lacks, so the inspector/edits can target them too.
+const savePlayers = useQuery({
+  queryKey: ['savePlayers'],
+  queryFn: () => api.getSavePlayers(),
+  enabled: saveAvailable,
+  staleTime: 60_000,
+})
+function openFromRoster(rp: { name: string; level: number | null }): void {
+  const match = savePlayers.data.value?.players.find((p) => p.name === rp.name)
+  if (!match) return
+  selected.value = {
+    name: rp.name,
+    playerId: match.uid,
+    userId: null,
+    level: rp.level,
+    ping: null,
+    location: null,
+  }
+}
+// Online players other than the one being teleported — targets to copy a
+// position from (they have a saved location to read).
+const teleportTargets = computed(() => list.value.filter((p) => p !== teleporting.value))
 
 const { kick, ban } = useServerCommands()
 const actingId = ref<string | null>(null)
@@ -151,15 +184,28 @@ function confirmBan(): void {
       <h3 class="text-sm font-medium text-muted-foreground">
         Offline · {{ offlinePlayers.length }}
       </h3>
-      <OfflinePlayersTable :players="offlinePlayers" />
+      <OfflinePlayersTable
+        :players="offlinePlayers"
+        :can-open="saveAvailable"
+        @select="openFromRoster"
+      />
     </div>
 
     <PlayerDetailDialog
       :player="selected"
       :busy="actingId !== null"
+      :can-teleport="canTeleport"
       @close="selected = null"
       @kick="(p) => ((selected = null), onKick(p))"
       @ban="(p) => ((selected = null), (banTarget = p))"
+      @teleport="(p) => ((selected = null), (teleporting = p))"
+    />
+
+    <TeleportDialog
+      :player="teleporting"
+      :others="teleportTargets"
+      @close="teleporting = null"
+      @done="teleporting = null"
     />
 
     <ConfirmDialog

@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify'
 import { applyIniAndRestart } from '../services/config-apply'
 import { isConfigAvailable } from '../services/game-config'
-import { getEvents, getProfile, markEvent } from '../services/config-profiles'
+import { getEvents, getProfile, inWeeklyWindow, markEvent } from '../services/config-profiles'
 import { recordAudit } from '../services/audit'
 
 const TICK_MS = 20_000
@@ -40,16 +40,37 @@ export async function registerConfigEventScheduler(app: FastifyInstance): Promis
   }
 
   async function tick(): Promise<void> {
-    const now = new Date().getTime()
+    const now = new Date()
     for (const event of getEvents()) {
-      const start = new Date(event.startsAt).getTime()
-      const end = new Date(event.endsAt).getTime()
-
       // Mark before applying so a slow apply can't double-fire on the next tick.
-      if (!event.activated && now >= start && now < end) {
+      if (event.recurrence === 'weekly') {
+        if (event.startDay == null || !event.startTime || event.endDay == null || !event.endTime)
+          continue
+        const inside = inWeeklyWindow(
+          now,
+          event.startDay,
+          event.startTime,
+          event.endDay,
+          event.endTime,
+        )
+        if (inside && !event.active) {
+          markEvent(event.id, { active: true })
+          await applyProfile(event.profileId, 'Event started')
+        } else if (!inside && event.active) {
+          markEvent(event.id, { active: false })
+          await applyProfile(event.revertProfileId, 'Event ended')
+        }
+        continue
+      }
+
+      // One-off event with fixed start/end datetimes.
+      const t = now.getTime()
+      const start = event.startsAt ? new Date(event.startsAt).getTime() : Infinity
+      const end = event.endsAt ? new Date(event.endsAt).getTime() : Infinity
+      if (!event.activated && t >= start && t < end) {
         markEvent(event.id, { activated: true })
         await applyProfile(event.profileId, 'Event started')
-      } else if (event.activated && !event.reverted && now >= end) {
+      } else if (event.activated && !event.reverted && t >= end) {
         markEvent(event.id, { reverted: true })
         await applyProfile(event.revertProfileId, 'Event ended')
       }

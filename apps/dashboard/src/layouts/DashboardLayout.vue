@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { RouterView } from 'vue-router'
 import AppSidebar from '@/components/layout/AppSidebar.vue'
 import AppTopbar from '@/components/layout/AppTopbar.vue'
+import SaveBatchBar from '@/components/layout/SaveBatchBar.vue'
 import { useRealtime } from '@/composables/use-realtime'
 
 const sidebarOpen = ref(false)
@@ -40,6 +41,8 @@ const { connected } = useRealtime()
         </div>
       </main>
     </div>
+
+    <SaveBatchBar />
   </div>
 </template>
 

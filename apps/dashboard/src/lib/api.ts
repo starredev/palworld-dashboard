@@ -18,6 +18,14 @@ import {
   configEventSchema,
   authConfigSchema,
   auditResponseSchema,
+  saveEditorStatusSchema,
+  playerLocationSchema,
+  playerStatsSchema,
+  savePlayersResponseSchema,
+  paldeckResponseSchema,
+  inventoryResponseSchema,
+  saveBatchSchema,
+  batchApplyResultSchema,
   healthResponseSchema,
   palServerInfoSchema,
   palServerMetricsSchema,
@@ -52,6 +60,19 @@ import {
   type SessionResponse,
   type AuthConfig,
   type AuditResponse,
+  type SaveEditorStatus,
+  type PlayerLocation,
+  type PlayerStats,
+  type SavePlayersResponse,
+  type PaldeckResponse,
+  type PalEditInput,
+  type PlayerStatsInput,
+  type InventoryResponse,
+  type GiveItemInput,
+  type SaveBatch,
+  type SaveOpInput,
+  type BatchApplyResult,
+  type Vec3,
 } from '@tsuki/types'
 import { apiFetch, apiUrl } from './http'
 
@@ -263,5 +284,97 @@ export const api = {
 
   getAudit(limit = 200): Promise<AuditResponse> {
     return apiFetch(`/audit?limit=${limit}`, { schema: auditResponseSchema })
+  },
+
+  getSaveStatus(): Promise<SaveEditorStatus> {
+    return apiFetch('/save/status', { schema: saveEditorStatusSchema })
+  },
+
+  getPlayerSaveLocation(uid: string): Promise<PlayerLocation> {
+    return apiFetch(`/save/players/${encodeURIComponent(uid)}/location`, {
+      schema: playerLocationSchema,
+    })
+  },
+
+  teleportPlayer(uid: string, coords: Vec3): Promise<{ ok: boolean }> {
+    return apiFetch(`/save/players/${encodeURIComponent(uid)}/teleport`, {
+      method: 'POST',
+      body: JSON.stringify(coords),
+    }) as Promise<{ ok: boolean }>
+  },
+
+  getSavePlayers(): Promise<SavePlayersResponse> {
+    return apiFetch('/save/players', { schema: savePlayersResponseSchema })
+  },
+
+  getPaldeck(): Promise<PaldeckResponse> {
+    return apiFetch('/save/paldeck', { schema: paldeckResponseSchema })
+  },
+
+  getPlayerStats(uid: string): Promise<PlayerStats> {
+    return apiFetch(`/save/players/${encodeURIComponent(uid)}/stats`, { schema: playerStatsSchema })
+  },
+
+  getInventory(uid: string): Promise<InventoryResponse> {
+    return apiFetch(`/save/players/${encodeURIComponent(uid)}/inventory`, {
+      schema: inventoryResponseSchema,
+    })
+  },
+
+  giveItem(uid: string, input: GiveItemInput): Promise<{ ok: boolean }> {
+    return apiFetch(`/save/players/${encodeURIComponent(uid)}/give-item`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }) as Promise<{ ok: boolean }>
+  },
+
+  refuelPlayer(uid: string): Promise<{ ok: boolean }> {
+    return apiFetch(`/save/players/${encodeURIComponent(uid)}/refuel`, {
+      method: 'POST',
+    }) as Promise<{ ok: boolean }>
+  },
+
+  setPlayerLevel(uid: string, level: number): Promise<{ ok: boolean }> {
+    return apiFetch(`/save/players/${encodeURIComponent(uid)}/level`, {
+      method: 'POST',
+      body: JSON.stringify({ level }),
+    }) as Promise<{ ok: boolean }>
+  },
+
+  editPlayerStats(uid: string, input: PlayerStatsInput): Promise<{ ok: boolean }> {
+    return apiFetch(`/save/players/${encodeURIComponent(uid)}/edit-stats`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }) as Promise<{ ok: boolean }>
+  },
+
+  editPal(uid: string, instanceId: string, input: PalEditInput): Promise<{ ok: boolean }> {
+    return apiFetch(
+      `/save/players/${encodeURIComponent(uid)}/pals/${encodeURIComponent(instanceId)}`,
+      { method: 'POST', body: JSON.stringify(input) },
+    ) as Promise<{ ok: boolean }>
+  },
+
+  clonePal(uid: string, instanceId: string): Promise<{ ok: boolean }> {
+    return apiFetch(
+      `/save/players/${encodeURIComponent(uid)}/pals/${encodeURIComponent(instanceId)}/clone`,
+      { method: 'POST' },
+    ) as Promise<{ ok: boolean }>
+  },
+
+  getSaveBatch(): Promise<SaveBatch> {
+    return apiFetch('/save/batch', { schema: saveBatchSchema })
+  },
+  addSaveOp(op: SaveOpInput): Promise<unknown> {
+    return apiFetch('/save/batch', { method: 'POST', body: JSON.stringify(op) })
+  },
+  removeSaveOp(id: string): Promise<unknown> {
+    return apiFetch(`/save/batch/${encodeURIComponent(id)}`, { method: 'DELETE' })
+  },
+  clearSaveBatch(): Promise<unknown> {
+    return apiFetch('/save/batch', { method: 'DELETE' })
+  },
+  applySaveBatch(): Promise<BatchApplyResult> {
+    return apiFetch('/save/batch/apply', { method: 'POST', schema: batchApplyResultSchema })
   },
 }

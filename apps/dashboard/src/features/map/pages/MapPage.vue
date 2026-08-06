@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, reactive } from 'vue'
+import { computed, reactive, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { useQuery } from '@tanstack/vue-query'
-import { ExternalLink, Map as MapIcon } from 'lucide-vue-next'
+import { ExternalLink, Map as MapIcon, X } from 'lucide-vue-next'
 import type { MapPoint, MapPointKind } from '@tsuki/types'
 import { Button, Card, Skeleton, cn } from '@tsuki/ui'
 import { api } from '@/lib/api'
@@ -22,6 +23,99 @@ const map = useQuery({
 const points = computed(() => [...(map.data.value?.points ?? []), ...pois])
 const unavailable = computed(() => map.data.value && !map.data.value.available)
 
+const visible = reactive<Record<MapPointKind, boolean>>({
+  player: true,
+  base: true,
+  pal: true,
+  wild: true,
+  npc: true,
+  boss: true,
+  alpha: false,
+})
+
+// Species filter for wild pals — "where does X occur (right now)". Populated
+// from the live wild-pal detail values actually present in the world.
+const route = useRoute()
+const species = ref('')
+watch(
+  () => route.query.species,
+  (s) => {
+    if (typeof s === 'string' && s) {
+      species.value = s
+      visible.wild = true
+    }
+  },
+  { immediate: true },
+)
+
+const wildSpecies = computed(() =>
+  [
+    ...new Set(points.value.filter((p) => p.kind === 'wild' && p.detail).map((p) => p.detail!)),
+  ].sort((a, b) => a.localeCompare(b)),
+)
+const speciesMatch = (detail: string | null) =>
+  !!detail && detail.toLowerCase() === species.value.toLowerCase()
+const displayPoints = computed(() =>
+  species.value
+    ? points.value.filter((p) => p.kind !== 'wild' || speciesMatch(p.detail))
+    : points.value,
+)
+const wildMatchCount = computed(() =>
+  species.value
+    ? points.value.filter((p) => p.kind === 'wild' && speciesMatch(p.detail)).length
+    : 0,
+)
+
+// Circle the area(s) where the selected species is — cluster nearby wild pals
+// and cover each cluster with a padded circle (world units).
+const worldSpan = computed(() => {
+  const b = mapBounds.value
+  return b && b.length === 4
+    ? Math.max(Math.abs(b[2] - b[0]), Math.abs(b[3] - b[1])) || 1_448_800
+    : 1_448_800
+})
+function clusterAreas(pts: { x: number; y: number }[]): { x: number; y: number; r: number }[] {
+  const span = worldSpan.value
+  const threshold = span * 0.12
+  const pad = span * 0.05
+  const minR = span * 0.03
+  const clusters: { sx: number; sy: number; n: number; pts: { x: number; y: number }[] }[] = []
+  for (const p of pts) {
+    let best: (typeof clusters)[number] | null = null
+    let bestD = Infinity
+    for (const c of clusters) {
+      const d = Math.hypot(p.x - c.sx / c.n, p.y - c.sy / c.n)
+      if (d < bestD) {
+        bestD = d
+        best = c
+      }
+    }
+    if (best && bestD < threshold) {
+      best.sx += p.x
+      best.sy += p.y
+      best.n++
+      best.pts.push(p)
+    } else {
+      clusters.push({ sx: p.x, sy: p.y, n: 1, pts: [p] })
+    }
+  }
+  return clusters.map((c) => {
+    const cx = c.sx / c.n
+    const cy = c.sy / c.n
+    const r = Math.max(...c.pts.map((p) => Math.hypot(p.x - cx, p.y - cy)), minR) + pad
+    return { x: cx, y: cy, r }
+  })
+}
+const speciesAreas = computed(() =>
+  species.value
+    ? clusterAreas(
+        points.value
+          .filter((p) => p.kind === 'wild' && speciesMatch(p.detail))
+          .map((p) => ({ x: p.x, y: p.y })),
+      )
+    : [],
+)
+
 const liveMapUrl = computed(() => {
   if (config.data.value?.liveMapUrl) return config.data.value.liveMapUrl
   const { protocol, hostname } = window.location
@@ -39,16 +133,6 @@ const LAYERS: { kind: MapPointKind; label: string; color: string }[] = [
   { kind: 'boss', label: 'Bosses', color: '#c084fc' },
   { kind: 'alpha', label: 'Alphas', color: '#fb923c' },
 ]
-
-const visible = reactive<Record<MapPointKind, boolean>>({
-  player: true,
-  base: true,
-  pal: true,
-  wild: true,
-  npc: true,
-  boss: true,
-  alpha: false,
-})
 
 function count(kind: MapPointKind): number {
   return points.value.filter((p) => p.kind === kind).length
@@ -111,12 +195,35 @@ function count(kind: MapPointKind): number {
         </button>
       </div>
 
+      <div v-if="wildSpecies.length" class="flex flex-wrap items-center gap-2">
+        <label class="text-xs text-muted-foreground">Find species</label>
+        <select
+          v-model="species"
+          class="h-8 rounded-lg border border-border bg-background px-2.5 text-xs outline-none focus:ring-2 focus:ring-ring"
+        >
+          <option value="">All wild pals</option>
+          <option v-for="s in wildSpecies" :key="s" :value="s">{{ s }}</option>
+        </select>
+        <span v-if="species" class="text-xs text-muted-foreground">
+          {{ wildMatchCount }} in the world
+        </span>
+        <button
+          v-if="species"
+          type="button"
+          class="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+          @click="species = ''"
+        >
+          <X class="size-3.5" /> clear
+        </button>
+      </div>
+
       <Card class="p-3 sm:p-4">
         <CoordinateMap
-          :points="points"
+          :points="displayPoints"
           :visible="visible"
           :image-url="mapImageUrl"
           :bounds="mapBounds"
+          :areas="speciesAreas"
         />
       </Card>
     </template>

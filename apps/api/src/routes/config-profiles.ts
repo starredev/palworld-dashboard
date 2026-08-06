@@ -72,7 +72,8 @@ export async function configProfileRoutes(app: FastifyInstance): Promise<void> {
   app.post('/server/config/events', { preHandler: requireAdmin }, async (req, reply) => {
     const parsed = configEventInputSchema.safeParse(req.body)
     if (!parsed.success) return reply.status(400).send({ message: 'Invalid event' })
-    if (new Date(parsed.data.endsAt) <= new Date(parsed.data.startsAt)) {
+    const { recurrence, startsAt, endsAt } = parsed.data
+    if (recurrence !== 'weekly' && startsAt && endsAt && new Date(endsAt) <= new Date(startsAt)) {
       return reply.status(400).send({ message: 'The end time must be after the start time' })
     }
     if (!getProfile(parsed.data.profileId) || !getProfile(parsed.data.revertProfileId)) {

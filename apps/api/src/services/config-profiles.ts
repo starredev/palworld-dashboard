@@ -81,7 +81,8 @@ export function deleteProfile(id: string): void {
 
 export function createEvent(input: ConfigEventInput): ConfigEvent {
   const state = load()
-  const event: ConfigEvent = { id: randomUUID(), activated: false, reverted: false, ...input }
+  // Parse through the schema so once/weekly fields get their defaults filled.
+  const event = configEventSchema.parse({ id: randomUUID(), ...input })
   persist({ ...state, events: [...state.events, event] })
   return event
 }
@@ -91,18 +92,46 @@ export function deleteEvent(id: string): void {
   persist({ ...state, events: state.events.filter((e) => e.id !== id) })
 }
 
-/** Persist activation/revert progress so an API restart doesn't re-fire an event. */
+/** Persist progress so an API restart doesn't re-fire an event. */
 export function markEvent(
   id: string,
-  patch: Partial<Pick<ConfigEvent, 'activated' | 'reverted'>>,
+  patch: Partial<Pick<ConfigEvent, 'activated' | 'reverted' | 'active'>>,
 ): void {
   const state = load()
   persist({ ...state, events: state.events.map((e) => (e.id === id ? { ...e, ...patch } : e)) })
 }
 
+/**
+ * Is `now` inside a weekly day+time window? The window may wrap the week
+ * (start after end, e.g. Fri 18:00 → Mon 06:00). Uses local (container) time.
+ */
+export function inWeeklyWindow(
+  now: Date,
+  startDay: number,
+  startTime: string,
+  endDay: number,
+  endTime: string,
+): boolean {
+  const toMin = (d: number, t: string): number => {
+    const [h, m] = t.split(':').map(Number)
+    return d * 1440 + h * 60 + m
+  }
+  const wk = now.getDay() * 1440 + now.getHours() * 60 + now.getMinutes()
+  const s = toMin(startDay, startTime)
+  const e = toMin(endDay, endTime)
+  return s <= e ? wk >= s && wk < e : wk >= s || wk < e
+}
+
 export function eventStatus(event: ConfigEvent, now: Date): 'upcoming' | 'active' | 'done' {
+  if (event.recurrence === 'weekly') {
+    if (event.startDay == null || !event.startTime || event.endDay == null || !event.endTime)
+      return 'upcoming'
+    return inWeeklyWindow(now, event.startDay, event.startTime, event.endDay, event.endTime)
+      ? 'active'
+      : 'upcoming'
+  }
   const t = now.getTime()
-  if (t < new Date(event.startsAt).getTime()) return 'upcoming'
-  if (t >= new Date(event.endsAt).getTime()) return 'done'
+  if (!event.startsAt || t < new Date(event.startsAt).getTime()) return 'upcoming'
+  if (!event.endsAt || t >= new Date(event.endsAt).getTime()) return 'done'
   return 'active'
 }

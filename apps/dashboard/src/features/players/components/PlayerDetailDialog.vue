@@ -1,13 +1,19 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { RouterLink } from 'vue-router'
-import { X, UserX, Ban, Copy, Check, MapPin } from 'lucide-vue-next'
+import { X, UserX, Ban, Copy, Check, MapPin, Navigation } from 'lucide-vue-next'
 import { Button } from '@tsuki/ui'
 import type { PalPlayer } from '@tsuki/types'
 import { useAuthStore } from '@/stores/auth'
+import PlayerSaveSection from './PlayerSaveSection.vue'
 
-defineProps<{ player: PalPlayer | null; busy?: boolean }>()
-const emit = defineEmits<{ close: []; kick: [PalPlayer]; ban: [PalPlayer] }>()
+defineProps<{ player: PalPlayer | null; busy?: boolean; canTeleport?: boolean }>()
+const emit = defineEmits<{
+  close: []
+  kick: [PalPlayer]
+  ban: [PalPlayer]
+  teleport: [PalPlayer]
+}>()
 
 const auth = useAuthStore()
 const copied = ref('')
@@ -29,7 +35,7 @@ function dash(v: string | number | null | undefined): string {
         <div
           role="dialog"
           aria-modal="true"
-          class="relative z-10 w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl"
+          class="relative z-10 max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-border bg-card p-6 shadow-2xl"
         >
           <button
             class="absolute right-4 top-4 text-muted-foreground hover:text-foreground"
@@ -99,6 +105,16 @@ function dash(v: string | number | null | undefined): string {
 
           <div v-if="auth.isAdmin" class="mt-6 flex justify-end gap-2">
             <Button
+              v-if="canTeleport"
+              variant="outline"
+              size="sm"
+              :disabled="!player.playerId || busy"
+              class="mr-auto"
+              @click="emit('teleport', player)"
+            >
+              <Navigation /> Teleport
+            </Button>
+            <Button
               variant="outline"
               size="sm"
               :disabled="!player.userId || busy"
@@ -115,6 +131,8 @@ function dash(v: string | number | null | undefined): string {
               <Ban /> Ban
             </Button>
           </div>
+
+          <PlayerSaveSection v-if="canTeleport" :player="player" :can-edit="canTeleport" />
         </div>
       </div>
     </Transition>
