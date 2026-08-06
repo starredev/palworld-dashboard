@@ -11,6 +11,11 @@ const data = ref<InventoryResponse | null>(null)
 const loading = ref(false)
 const error = ref('')
 
+// id -> { n: display name, c: category }. Lazy-loaded (big) on first inventory read.
+type ItemMeta = { n: string; c: string }
+const items = ref<Record<string, ItemMeta>>({})
+const itemsLower = ref<Record<string, ItemMeta>>({})
+
 // Reading inventory decodes the player file AND Level.sav, so load on demand.
 async function load(): Promise<void> {
   if (!props.uid) {
@@ -20,6 +25,12 @@ async function load(): Promise<void> {
   loading.value = true
   error.value = ''
   try {
+    if (!Object.keys(items.value).length) {
+      items.value = (await import('../items.json')).default as Record<string, ItemMeta>
+      itemsLower.value = Object.fromEntries(
+        Object.entries(items.value).map(([k, v]) => [k.toLowerCase(), v]),
+      )
+    }
     data.value = await api.getInventory(props.uid)
   } catch (e) {
     error.value = (e as Error).message
@@ -36,8 +47,24 @@ watch(
   },
 )
 
-/** Trim common id noise for a friendlier label (still the raw static id). */
 const pretty = (id: string) => id.replace(/^(PalItem_|Item_)/, '').replace(/_/g, ' ')
+const meta = (id: string): ItemMeta | undefined =>
+  items.value[id] ?? itemsLower.value[id.toLowerCase()]
+const label = (id: string) => meta(id)?.n ?? pretty(id)
+
+const CAT_COLOR: Record<string, string> = {
+  Material: '#a3a3a3',
+  Ammo: '#f59e0b',
+  Food: '#4ade80',
+  Consume: '#38bdf8',
+  Weapon: '#f87171',
+  SpecialWeapon: '#fb7185',
+  Armor: '#818cf8',
+  Accessory: '#c084fc',
+  Essential: '#facc15',
+  Blueprint: '#22d3ee',
+}
+const catColor = (id: string) => CAT_COLOR[meta(id)?.c ?? 'Material'] ?? '#71717a'
 </script>
 
 <template>
@@ -60,14 +87,18 @@ const pretty = (id: string) => id.replace(/^(PalItem_|Item_)/, '').replace(/_/g,
       </p>
       <div v-for="c in data.containers" :key="c.name" class="mt-3">
         <p class="mb-1 text-[11px] font-medium text-muted-foreground">{{ c.name }}</p>
-        <div class="grid grid-cols-2 gap-1">
+        <div class="grid grid-cols-2 gap-1 sm:grid-cols-3">
           <div
             v-for="(item, i) in c.items"
             :key="i"
-            class="flex items-center justify-between rounded-md bg-muted/30 px-2 py-1 text-xs"
+            class="flex items-center gap-2 rounded-md bg-muted/30 px-2 py-1.5 text-xs"
           >
-            <span class="truncate" :title="item.id">{{ pretty(item.id) }}</span>
-            <span class="shrink-0 text-muted-foreground">×{{ item.count }}</span>
+            <span
+              class="size-2 shrink-0 rounded-full"
+              :style="{ backgroundColor: catColor(item.id) }"
+            />
+            <span class="min-w-0 flex-1 truncate" :title="item.id">{{ label(item.id) }}</span>
+            <span class="shrink-0 font-medium text-muted-foreground">×{{ item.count }}</span>
           </div>
         </div>
       </div>

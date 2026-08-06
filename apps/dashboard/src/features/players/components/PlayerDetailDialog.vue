@@ -35,7 +35,7 @@ function dash(v: string | number | null | undefined): string {
         <div
           role="dialog"
           aria-modal="true"
-          class="relative z-10 w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl"
+          class="relative z-10 max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-border bg-card p-6 shadow-2xl"
         >
           <button
             class="absolute right-4 top-4 text-muted-foreground hover:text-foreground"
