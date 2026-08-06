@@ -12,10 +12,20 @@ const data = ref<InventoryResponse | null>(null)
 const loading = ref(false)
 const error = ref('')
 
-// id -> { n: display name, c: category }. Lazy-loaded (big) on first inventory read.
-type ItemMeta = { n: string; c: string }
+// id -> { n: display name, c: category, img?: icon filename }. Lazy-loaded.
+type ItemMeta = { n: string; c: string; img?: string }
 const items = ref<Record<string, ItemMeta>>({})
 const itemsLower = ref<Record<string, ItemMeta>>({})
+const broken = ref<Set<string>>(new Set())
+const iconUrl = (id: string): string | null => {
+  const img = meta(id)?.img
+  return img
+    ? `https://cdn.jsdelivr.net/gh/mlg404/palworld-paldex-api@main/public/images/items/${img}`
+    : null
+}
+function onImgError(id: string): void {
+  broken.value = new Set(broken.value).add(id)
+}
 
 // Reading inventory decodes the player file AND Level.sav, so load on demand.
 async function load(): Promise<void> {
@@ -137,8 +147,17 @@ function queueGive(): void {
             :key="i"
             class="flex items-center gap-2 rounded-md bg-muted/30 px-2 py-1.5 text-xs"
           >
+            <img
+              v-if="iconUrl(item.id) && !broken.has(item.id)"
+              :src="iconUrl(item.id)!"
+              :alt="label(item.id)"
+              loading="lazy"
+              class="size-5 shrink-0 object-contain"
+              @error="onImgError(item.id)"
+            />
             <span
-              class="size-2 shrink-0 rounded-full"
+              v-else
+              class="size-2.5 shrink-0 rounded-full"
               :style="{ backgroundColor: catColor(item.id) }"
             />
             <span class="min-w-0 flex-1 truncate" :title="item.id">{{ label(item.id) }}</span>
@@ -166,9 +185,17 @@ function queueGive(): void {
                 v-for="m in giveMatches"
                 :key="m.id"
                 type="button"
-                class="block w-full px-3 py-1.5 text-left text-xs hover:bg-accent"
+                class="flex w-full items-center gap-2 px-3 py-1.5 text-left text-xs hover:bg-accent"
                 @click="pickGive(m)"
               >
+                <img
+                  v-if="iconUrl(m.id) && !broken.has(m.id)"
+                  :src="iconUrl(m.id)!"
+                  :alt="m.n"
+                  loading="lazy"
+                  class="size-4 shrink-0 object-contain"
+                  @error="onImgError(m.id)"
+                />
                 {{ m.n }}
               </button>
             </div>
