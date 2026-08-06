@@ -2,7 +2,8 @@
 import { Card } from '@tsuki/ui'
 import type { RosterPlayer } from '@tsuki/types'
 
-defineProps<{ players: RosterPlayer[] }>()
+defineProps<{ players: RosterPlayer[]; canOpen?: boolean }>()
+const emit = defineEmits<{ select: [RosterPlayer] }>()
 
 function dash(v: string | number | null | undefined): string {
   return v == null || v === '' ? '—' : String(v)
@@ -37,9 +38,14 @@ function lastSeen(iso: string | null): string {
             v-for="player in players"
             :key="player.id"
             class="border-b border-border/60 last:border-0 hover:bg-accent/40"
+            :class="canOpen && 'cursor-pointer'"
+            @click="canOpen && emit('select', player)"
           >
             <td class="px-5 py-3">
-              <span class="flex items-center gap-2 font-medium">
+              <span
+                class="flex items-center gap-2 font-medium"
+                :class="canOpen && 'hover:text-primary'"
+              >
                 <span class="size-1.5 rounded-full bg-zinc-500" />
                 {{ dash(player.name) }}
               </span>

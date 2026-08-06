@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { parseLevelSummary, parsePlayerStats, refuelPlayer, setPlayerLevel } from './save-level'
+import {
+  parseLevelPlayers,
+  parseLevelSummary,
+  parsePlayerStats,
+  refuelPlayer,
+  setPlayerLevel,
+} from './save-level'
 
 // palworld-save-tools-shaped Level.sav CharacterSaveParameterMap entry.
 function entry(opts: {
@@ -113,6 +119,26 @@ describe('setPlayerLevel', () => {
 
   it('throws when the Level field is absent', () => {
     expect(() => setPlayerLevel({}, 30)).toThrow(/Level/)
+  })
+})
+
+describe('parseLevelPlayers', () => {
+  it('lists players with the uid in save-file form (32-hex uppercase)', () => {
+    const json = levelJson([
+      entry({ isPlayer: true, playerUid: MELVIN_GUID, nick: 'Melvin265', level: 23 }),
+      entry({
+        isPlayer: true,
+        playerUid: 'a87a257d-0000-0000-0000-000000000000',
+        nick: 'Invisiouz',
+        level: 24,
+      }),
+      entry({ species: 'Foxparks', ownerUid: MELVIN_GUID }), // pal — excluded
+    ])
+    const players = parseLevelPlayers(json)
+    expect(players).toEqual([
+      { uid: 'A87A257D000000000000000000000000', name: 'Invisiouz', level: 24 }, // sorted by level desc
+      { uid: MELVIN, name: 'Melvin265', level: 23 },
+    ])
   })
 })
 

@@ -8,6 +8,7 @@ import {
   type PlayerLocation,
   type PlayerStats,
   type SaveEditorStatus,
+  type SavePlayersResponse,
 } from '@tsuki/types'
 import { authenticate, requireAdmin } from '../plugins/auth'
 import { loadEnv } from '../config/env'
@@ -17,6 +18,7 @@ import { readPlayerLocation, teleportPlayer } from '../services/save-teleport'
 import { giveTechPoints, readPlayerDetail } from '../services/save-player-fields'
 import {
   isLevelAvailable,
+  readLevelPlayers,
   readLevelSummary,
   readPlayerStats,
   refuelPlayerInLevel,
@@ -84,6 +86,24 @@ export async function saveEditorRoutes(app: FastifyInstance): Promise<void> {
       }
       try {
         return { available: true, ...(await readPlayerStats(req.params.uid)) }
+      } catch (error) {
+        reply.log.error(error)
+        return reply.status(400).send({ message: (error as Error).message })
+      }
+    },
+  )
+
+  // Read-only: every player in the save (online or not) with their save uid —
+  // lets the inspector/teleport/edits target offline players too.
+  app.get(
+    '/save/players',
+    { preHandler: authenticate },
+    async (_req, reply): Promise<SavePlayersResponse> => {
+      if (!isLevelAvailable()) {
+        return reply.status(503).send({ message: 'Level.sav is not available' })
+      }
+      try {
+        return { available: true, players: await readLevelPlayers() }
       } catch (error) {
         reply.log.error(error)
         return reply.status(400).send({ message: (error as Error).message })

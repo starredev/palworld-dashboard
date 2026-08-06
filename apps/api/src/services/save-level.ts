@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import type { FastifyInstance } from 'fastify'
-import type { LevelSummary, PlayerStats } from '@tsuki/types'
+import type { LevelSummary, PlayerStats, SavePlayer } from '@tsuki/types'
 import { readSaveJson, isSaveEditorAvailable } from './save-editor'
 import { editSaveFile } from './save-edit'
 import { deepFind } from './save-location'
@@ -147,6 +147,32 @@ export function parseLevelSummary(levelJson: unknown): Omit<LevelSummary, 'avail
 /** Read a player's stats + pals from Level.sav (decodes the whole file). */
 export async function readPlayerStats(uid: string): Promise<Omit<PlayerStats, 'available'>> {
   return parsePlayerStats(await readSaveJson(levelSavPath()), uid)
+}
+
+/**
+ * Pure: every player in the save (online or not), with the uid in save-file
+ * form (32-hex uppercase). PlayerUId GUIDs are `<id>` + all-zero groups, so the
+ * plain hex equals the `Players/<uid>.sav` filename.
+ */
+export function parseLevelPlayers(levelJson: unknown): SavePlayer[] {
+  const players: SavePlayer[] = []
+  for (const entry of characterEntries(levelJson)) {
+    const params = saveParam(entry)
+    if (!params || !isPlayerParams(params)) continue
+    const guid = dig(entry, 'key', 'PlayerUId', 'value')
+    if (typeof guid !== 'string') continue
+    players.push({
+      uid: normUid(guid).toUpperCase(),
+      name: strVal(params['NickName']),
+      level: byteVal(params['Level']) ?? 1,
+    })
+  }
+  return players.sort((a, b) => (b.level ?? 0) - (a.level ?? 0))
+}
+
+/** List all players from Level.sav (drives the save editor for offline players). */
+export async function readLevelPlayers(): Promise<SavePlayer[]> {
+  return parseLevelPlayers(await readSaveJson(levelSavPath()))
 }
 
 // ---- Writes (mutate the parsed Level.sav in place; run via editSaveFile) ----

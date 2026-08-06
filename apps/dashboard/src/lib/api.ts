@@ -21,6 +21,7 @@ import {
   saveEditorStatusSchema,
   playerLocationSchema,
   playerStatsSchema,
+  savePlayersResponseSchema,
   healthResponseSchema,
   palServerInfoSchema,
   palServerMetricsSchema,
@@ -58,6 +59,7 @@ import {
   type SaveEditorStatus,
   type PlayerLocation,
   type PlayerStats,
+  type SavePlayersResponse,
   type Vec3,
 } from '@tsuki/types'
 import { apiFetch, apiUrl } from './http'
@@ -287,6 +289,10 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(coords),
     }) as Promise<{ ok: boolean }>
+  },
+
+  getSavePlayers(): Promise<SavePlayersResponse> {
+    return apiFetch('/save/players', { schema: savePlayersResponseSchema })
   },
 
   getPlayerStats(uid: string): Promise<PlayerStats> {

@@ -71,6 +71,20 @@ export const playerStatsSchema = z.object({
 })
 export type PlayerStats = z.infer<typeof playerStatsSchema>
 
+/** A player as listed from the save itself (works for offline players too). */
+export const savePlayerSchema = z.object({
+  uid: z.string(),
+  name: z.string().nullable(),
+  level: z.number().nullable(),
+})
+export type SavePlayer = z.infer<typeof savePlayerSchema>
+
+export const savePlayersResponseSchema = z.object({
+  available: z.boolean(),
+  players: z.array(savePlayerSchema),
+})
+export type SavePlayersResponse = z.infer<typeof savePlayersResponseSchema>
+
 /** Count of player vs pal records in Level.sav — a cheap decode health check. */
 export const levelSummarySchema = z.object({
   available: z.boolean(),
