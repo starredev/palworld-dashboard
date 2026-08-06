@@ -1,10 +1,9 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { useMutation } from '@tanstack/vue-query'
-import { X, TriangleAlert } from 'lucide-vue-next'
-import { Button, Input, ConfirmDialog } from '@tsuki/ui'
+import { X, Layers } from 'lucide-vue-next'
+import { Button, Input } from '@tsuki/ui'
 import type { PlayerStats, PlayerStatsInput } from '@tsuki/types'
-import { api } from '@/lib/api'
+import { useQueueOp } from '@/composables/use-save-batch'
 
 const props = defineProps<{ stats: PlayerStats | null; uid: string | null; name?: string }>()
 const emit = defineEmits<{ close: []; done: [] }>()
@@ -67,15 +66,18 @@ function buildInput(): PlayerStatsInput {
   return input
 }
 
-const confirming = ref(false)
-const save = useMutation({
-  mutationFn: () => api.editPlayerStats(props.uid!, buildInput()),
-  onSuccess: () => {
-    confirming.value = false
-    emit('done')
-    emit('close')
-  },
-})
+const queue = useQueueOp()
+function queueEdit(): void {
+  queue.mutate(
+    {
+      type: 'playerStats',
+      uid: props.uid!,
+      label: `Edit stats · ${props.name ?? 'player'}`,
+      input: buildInput(),
+    },
+    { onSuccess: () => (emit('done'), emit('close')) },
+  )
+}
 </script>
 
 <template>
@@ -130,43 +132,20 @@ const save = useMutation({
             No allocated stat points found for this player.
           </p>
 
-          <div
-            class="mt-5 flex gap-2.5 rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 text-xs text-amber-200/90"
-          >
-            <TriangleAlert class="mt-0.5 size-4 shrink-0 text-amber-400" />
-            <span>Editing the save stops the server and restarts it. A backup is taken first.</span>
-          </div>
-
-          <p v-if="save.isError.value" class="mt-3 text-xs text-red-400">
-            {{ (save.error.value as Error)?.message ?? 'Edit failed.' }}
+          <p v-if="queue.isError.value" class="mt-4 text-xs text-red-400">
+            {{ (queue.error.value as Error)?.message ?? 'Failed to queue.' }}
           </p>
 
           <div class="mt-6 flex justify-end gap-2">
             <Button variant="outline" size="sm" @click="emit('close')">Cancel</Button>
-            <Button
-              variant="destructive"
-              size="sm"
-              :disabled="!uid || save.isPending.value"
-              @click="confirming = true"
-            >
-              Apply &amp; restart
+            <Button size="sm" :disabled="!uid || queue.isPending.value" @click="queueEdit">
+              <Layers /> Add to batch
             </Button>
           </div>
         </div>
       </div>
     </Transition>
   </Teleport>
-
-  <ConfirmDialog
-    :open="confirming"
-    title="Edit player stats and restart?"
-    :description="`${name ?? 'This player'}'s stats will be updated in the save. The server restarts and everyone disconnects briefly.`"
-    tone="destructive"
-    confirm-label="Apply & restart"
-    :loading="save.isPending.value"
-    @update:open="(v: boolean) => !v && (confirming = false)"
-    @confirm="save.mutate()"
-  />
 </template>
 
 <style scoped>

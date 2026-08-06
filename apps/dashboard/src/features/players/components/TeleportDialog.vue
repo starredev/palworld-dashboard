@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { useMutation } from '@tanstack/vue-query'
-import { X, TriangleAlert, Loader2 } from 'lucide-vue-next'
-import { Button, Input, ConfirmDialog } from '@tsuki/ui'
+import { X, Loader2, Layers } from 'lucide-vue-next'
+import { Button, Input } from '@tsuki/ui'
 import type { PalPlayer } from '@tsuki/types'
 import { api } from '@/lib/api'
+import { useQueueOp } from '@/composables/use-save-batch'
 
 const props = defineProps<{ player: PalPlayer | null; others: PalPlayer[] }>()
 const emit = defineEmits<{ close: []; done: [] }>()
@@ -64,20 +64,20 @@ const valid = computed(() => {
   })
 })
 
-const confirming = ref(false)
-const teleport = useMutation({
-  mutationFn: () =>
-    api.teleportPlayer(props.player!.playerId!, {
-      x: Number(form.value.x),
-      y: Number(form.value.y),
-      z: Number(form.value.z),
-    }),
-  onSuccess: () => {
-    confirming.value = false
-    emit('done')
-    emit('close')
-  },
-})
+const queue = useQueueOp()
+function queueEdit(): void {
+  const p = props.player!
+  const coords = { x: Number(form.value.x), y: Number(form.value.y), z: Number(form.value.z) }
+  queue.mutate(
+    {
+      type: 'teleport',
+      uid: p.playerId!,
+      label: `Teleport ${p.name} → ${coords.x}, ${coords.y}`,
+      coords,
+    },
+    { onSuccess: () => (emit('done'), emit('close')) },
+  )
+}
 </script>
 
 <template>
@@ -138,47 +138,30 @@ const teleport = useMutation({
           </p>
           <p v-else-if="loadError" class="mt-2 text-xs text-amber-400">{{ loadError }}</p>
 
-          <!-- Restart warning -->
           <div
-            class="mt-5 flex gap-2.5 rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 text-xs text-amber-200/90"
+            class="mt-5 flex gap-2.5 rounded-lg border border-primary/20 bg-primary/10 p-3 text-xs text-primary/90"
           >
-            <TriangleAlert class="mt-0.5 size-4 shrink-0 text-amber-400" />
-            <span>
-              This stops the server, edits the save, and restarts it. Everyone is disconnected for a
-              moment. A backup is taken automatically first.
-            </span>
+            <Layers class="mt-0.5 size-4 shrink-0" />
+            <span
+              >Queued to the batch — nothing changes until you press “Apply all”, which restarts the
+              server once.</span
+            >
           </div>
 
-          <p v-if="teleport.isError.value" class="mt-3 text-xs text-red-400">
-            {{ (teleport.error.value as Error)?.message ?? 'Teleport failed.' }}
+          <p v-if="queue.isError.value" class="mt-3 text-xs text-red-400">
+            {{ (queue.error.value as Error)?.message ?? 'Failed to queue.' }}
           </p>
 
           <div class="mt-6 flex justify-end gap-2">
             <Button variant="outline" size="sm" @click="emit('close')">Cancel</Button>
-            <Button
-              variant="destructive"
-              size="sm"
-              :disabled="!valid || teleport.isPending.value"
-              @click="confirming = true"
-            >
-              Teleport &amp; restart
+            <Button size="sm" :disabled="!valid || queue.isPending.value" @click="queueEdit">
+              <Layers /> Add to batch
             </Button>
           </div>
         </div>
       </div>
     </Transition>
   </Teleport>
-
-  <ConfirmDialog
-    :open="confirming"
-    title="Teleport and restart the server?"
-    :description="`${player?.name ?? 'This player'} will be moved to ${form.x}, ${form.y}, ${form.z}. The server restarts and all players disconnect briefly.`"
-    tone="destructive"
-    confirm-label="Teleport & restart"
-    :loading="teleport.isPending.value"
-    @update:open="(v: boolean) => !v && (confirming = false)"
-    @confirm="teleport.mutate()"
-  />
 </template>
 
 <style scoped>

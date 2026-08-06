@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { useMutation } from '@tanstack/vue-query'
-import { X, TriangleAlert, HeartPulse, Copy } from 'lucide-vue-next'
-import { Button, Input, ConfirmDialog } from '@tsuki/ui'
+import { X, HeartPulse, Copy, Layers } from 'lucide-vue-next'
+import { Button, Input } from '@tsuki/ui'
 import type { PalSummary } from '@tsuki/types'
-import { api } from '@/lib/api'
+import { useQueueOp } from '@/composables/use-save-batch'
 
 const props = defineProps<{ pal: PalSummary | null; uid: string | null }>()
 const emit = defineEmits<{ close: []; done: [] }>()
+
+const done = () => (emit('done'), emit('close'))
 
 const form = ref({ level: '', hp: '', shot: '', defense: '', heal: false })
 
@@ -33,34 +34,38 @@ const num = (s: string) => {
   return Number.isFinite(n) ? n : 0
 }
 
-const confirming = ref(false)
-const edit = useMutation({
-  mutationFn: () =>
-    api.editPal(props.uid!, props.pal!.instanceId!, {
-      level: num(form.value.level),
-      talentHp: num(form.value.hp),
-      talentShot: num(form.value.shot),
-      talentDefense: num(form.value.defense),
-      ...(form.value.heal ? { heal: true } : {}),
-    }),
-  onSuccess: () => {
-    confirming.value = false
-    emit('done')
-    emit('close')
-  },
-})
-
 const canApply = computed(() => !!props.pal?.instanceId && !!props.uid)
+const queue = useQueueOp()
 
-const cloning = ref(false)
-const clone = useMutation({
-  mutationFn: () => api.clonePal(props.uid!, props.pal!.instanceId!),
-  onSuccess: () => {
-    cloning.value = false
-    emit('done')
-    emit('close')
-  },
-})
+function queueEdit(): void {
+  queue.mutate(
+    {
+      type: 'palEdit',
+      uid: props.uid!,
+      instanceId: props.pal!.instanceId!,
+      label: `Edit pal ${title.value}`,
+      input: {
+        level: num(form.value.level),
+        talentHp: num(form.value.hp),
+        talentShot: num(form.value.shot),
+        talentDefense: num(form.value.defense),
+        ...(form.value.heal ? { heal: true } : {}),
+      },
+    },
+    { onSuccess: done },
+  )
+}
+function queueClone(): void {
+  queue.mutate(
+    {
+      type: 'palClone',
+      uid: props.uid!,
+      instanceId: props.pal!.instanceId!,
+      label: `Duplicate pal ${title.value}`,
+    },
+    { onSuccess: done },
+  )
+}
 </script>
 
 <template>
@@ -107,35 +112,23 @@ const clone = useMutation({
             <HeartPulse class="size-4 text-emerald-400" /> Fully heal (HP, hunger, cure sickness)
           </label>
 
-          <div
-            class="mt-5 flex gap-2.5 rounded-lg border border-amber-500/20 bg-amber-500/10 p-3 text-xs text-amber-200/90"
-          >
-            <TriangleAlert class="mt-0.5 size-4 shrink-0 text-amber-400" />
-            <span>Editing the save stops the server and restarts it. A backup is taken first.</span>
-          </div>
-
-          <p v-if="edit.isError.value" class="mt-3 text-xs text-red-400">
-            {{ (edit.error.value as Error)?.message ?? 'Edit failed.' }}
+          <p v-if="queue.isError.value" class="mt-4 text-xs text-red-400">
+            {{ (queue.error.value as Error)?.message ?? 'Failed to queue.' }}
           </p>
 
           <div class="mt-6 flex items-center justify-between gap-2">
             <Button
               variant="outline"
               size="sm"
-              :disabled="!canApply || clone.isPending.value"
-              @click="cloning = true"
+              :disabled="!canApply || queue.isPending.value"
+              @click="queueClone"
             >
               <Copy /> Duplicate
             </Button>
             <div class="flex gap-2">
               <Button variant="outline" size="sm" @click="emit('close')">Cancel</Button>
-              <Button
-                variant="destructive"
-                size="sm"
-                :disabled="!canApply || edit.isPending.value"
-                @click="confirming = true"
-              >
-                Apply &amp; restart
+              <Button size="sm" :disabled="!canApply || queue.isPending.value" @click="queueEdit">
+                <Layers /> Add to batch
               </Button>
             </div>
           </div>
@@ -143,28 +136,6 @@ const clone = useMutation({
       </div>
     </Transition>
   </Teleport>
-
-  <ConfirmDialog
-    :open="confirming"
-    title="Edit this pal and restart?"
-    :description="`${title} will be updated in the save. The server restarts and everyone disconnects briefly.`"
-    tone="destructive"
-    confirm-label="Apply & restart"
-    :loading="edit.isPending.value"
-    @update:open="(v: boolean) => !v && (confirming = false)"
-    @confirm="edit.mutate()"
-  />
-
-  <ConfirmDialog
-    :open="cloning"
-    title="Duplicate this pal and restart?"
-    :description="`A copy of ${title} will be added to the player's Pal box. The server restarts and everyone disconnects briefly.`"
-    tone="destructive"
-    confirm-label="Duplicate & restart"
-    :loading="clone.isPending.value"
-    @update:open="(v: boolean) => !v && (cloning = false)"
-    @confirm="clone.mutate()"
-  />
 </template>
 
 <style scoped>

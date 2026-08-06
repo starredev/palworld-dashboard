@@ -196,3 +196,84 @@ export const techPointsInputSchema = z
     message: 'Provide technologyPoint and/or bossTechnologyPoint',
   })
 export type TechPointsInput = z.infer<typeof techPointsInputSchema>
+
+// ---- Batch edits: queue several save edits, apply all with ONE restart ----
+// `label` is a human description shown in the pending list; `uid` is the player.
+// (Placed last so it can reference the input schemas declared above.)
+const teleportOp = {
+  type: z.literal('teleport'),
+  uid: z.string(),
+  label: z.string(),
+  coords: vec3Schema,
+}
+const techOp = {
+  type: z.literal('techPoints'),
+  uid: z.string(),
+  label: z.string(),
+  input: techPointsInputSchema,
+}
+const levelOp = {
+  type: z.literal('playerLevel'),
+  uid: z.string(),
+  label: z.string(),
+  level: z.number().int().min(1).max(100),
+}
+const refuelOp = { type: z.literal('refuel'), uid: z.string(), label: z.string() }
+const statsOp = {
+  type: z.literal('playerStats'),
+  uid: z.string(),
+  label: z.string(),
+  input: playerStatsInputSchema,
+}
+const palEditOp = {
+  type: z.literal('palEdit'),
+  uid: z.string(),
+  label: z.string(),
+  instanceId: z.string(),
+  input: palEditInputSchema,
+}
+const palCloneOp = {
+  type: z.literal('palClone'),
+  uid: z.string(),
+  label: z.string(),
+  instanceId: z.string(),
+}
+const giveOp = {
+  type: z.literal('giveItem'),
+  uid: z.string(),
+  label: z.string(),
+  item: giveItemInputSchema,
+}
+
+export const saveOpInputSchema = z.discriminatedUnion('type', [
+  z.object(teleportOp),
+  z.object(techOp),
+  z.object(levelOp),
+  z.object(refuelOp),
+  z.object(statsOp),
+  z.object(palEditOp),
+  z.object(palCloneOp),
+  z.object(giveOp),
+])
+export type SaveOpInput = z.infer<typeof saveOpInputSchema>
+
+export const saveOpSchema = z.discriminatedUnion('type', [
+  z.object({ ...teleportOp, id: z.string() }),
+  z.object({ ...techOp, id: z.string() }),
+  z.object({ ...levelOp, id: z.string() }),
+  z.object({ ...refuelOp, id: z.string() }),
+  z.object({ ...statsOp, id: z.string() }),
+  z.object({ ...palEditOp, id: z.string() }),
+  z.object({ ...palCloneOp, id: z.string() }),
+  z.object({ ...giveOp, id: z.string() }),
+])
+export type SaveOp = z.infer<typeof saveOpSchema>
+
+export const saveBatchSchema = z.object({ ops: z.array(saveOpSchema) })
+export type SaveBatch = z.infer<typeof saveBatchSchema>
+
+export const batchApplyResultSchema = z.object({
+  applied: z.number(),
+  failed: z.array(z.object({ label: z.string(), error: z.string() })),
+})
+export type BatchApplyResult = z.infer<typeof batchApplyResultSchema>

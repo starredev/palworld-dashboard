@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { useMutation } from '@tanstack/vue-query'
-import { Loader2, Backpack, Gift } from 'lucide-vue-next'
-import { Button, Input, ConfirmDialog } from '@tsuki/ui'
+import { Loader2, Backpack, Layers } from 'lucide-vue-next'
+import { Button, Input } from '@tsuki/ui'
 import type { InventoryResponse } from '@tsuki/types'
 import { api } from '@/lib/api'
+import { useQueueOp } from '@/composables/use-save-batch'
 
 const props = defineProps<{ uid: string | null; canEdit?: boolean }>()
 
@@ -72,7 +72,6 @@ const giveSearch = ref('')
 const givePicked = ref<{ id: string; n: string } | null>(null)
 const giveCount = ref(1)
 const showList = ref(false)
-const confirming = ref(false)
 
 const giveMatches = computed(() => {
   const q = giveSearch.value.trim().toLowerCase()
@@ -90,20 +89,26 @@ function pickGive(m: { id: string; n: string }): void {
   showList.value = false
 }
 
-const give = useMutation({
-  mutationFn: () =>
-    api.giveItem(props.uid!, {
-      staticId: givePicked.value!.id,
-      count: Math.max(1, giveCount.value),
-    }),
-  onSuccess: async () => {
-    confirming.value = false
-    givePicked.value = null
-    giveSearch.value = ''
-    giveCount.value = 1
-    await load()
-  },
-})
+const queue = useQueueOp()
+function queueGive(): void {
+  if (!props.uid || !givePicked.value) return
+  const count = Math.max(1, giveCount.value)
+  queue.mutate(
+    {
+      type: 'giveItem',
+      uid: props.uid,
+      label: `Give ${count}× ${givePicked.value.n}`,
+      item: { staticId: givePicked.value.id, count },
+    },
+    {
+      onSuccess: () => {
+        givePicked.value = null
+        giveSearch.value = ''
+        giveCount.value = 1
+      },
+    },
+  )
+}
 </script>
 
 <template>
@@ -172,27 +177,16 @@ const give = useMutation({
           <Button
             variant="outline"
             size="sm"
-            :disabled="!givePicked || give.isPending.value"
-            @click="confirming = true"
+            :disabled="!givePicked || queue.isPending.value"
+            @click="queueGive"
           >
-            <Gift /> Give
+            <Layers /> Add to batch
           </Button>
         </div>
-        <p v-if="give.isError.value" class="mt-2 text-xs text-red-400">
-          {{ (give.error.value as Error)?.message ?? 'Failed to give item.' }}
+        <p v-if="queue.isError.value" class="mt-2 text-xs text-red-400">
+          {{ (queue.error.value as Error)?.message ?? 'Failed to queue.' }}
         </p>
       </div>
     </template>
-
-    <ConfirmDialog
-      :open="confirming"
-      title="Give item and restart?"
-      :description="`Give ${giveCount}× ${givePicked?.n ?? 'item'} — this stops the server, edits the save and restarts it. A backup is taken first.`"
-      tone="destructive"
-      confirm-label="Give & restart"
-      :loading="give.isPending.value"
-      @update:open="(v: boolean) => !v && (confirming = false)"
-      @confirm="give.mutate()"
-    />
   </div>
 </template>

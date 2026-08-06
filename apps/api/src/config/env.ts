@@ -132,6 +132,9 @@ const envSchema = z.object({
   // ---- Config profiles & scheduled events (persisted on the backups volume) ----
   CONFIG_PROFILES_PATH: z.string().default('/backups/tsuki-config-profiles.json'),
 
+  // ---- Save-editor batch queue (persisted on the backups volume) ----
+  SAVE_BATCH_PATH: z.string().default('/backups/tsuki-save-batch.json'),
+
   // ---- Activity / audit log (persisted on the backups volume) ----
   AUDIT_LOG_PATH: z.string().default('/backups/tsuki-audit.json'),
 

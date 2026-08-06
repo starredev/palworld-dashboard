@@ -24,6 +24,8 @@ import {
   savePlayersResponseSchema,
   paldeckResponseSchema,
   inventoryResponseSchema,
+  saveBatchSchema,
+  batchApplyResultSchema,
   healthResponseSchema,
   palServerInfoSchema,
   palServerMetricsSchema,
@@ -67,6 +69,9 @@ import {
   type PlayerStatsInput,
   type InventoryResponse,
   type GiveItemInput,
+  type SaveBatch,
+  type SaveOpInput,
+  type BatchApplyResult,
   type Vec3,
 } from '@tsuki/types'
 import { apiFetch, apiUrl } from './http'
@@ -355,5 +360,21 @@ export const api = {
       `/save/players/${encodeURIComponent(uid)}/pals/${encodeURIComponent(instanceId)}/clone`,
       { method: 'POST' },
     ) as Promise<{ ok: boolean }>
+  },
+
+  getSaveBatch(): Promise<SaveBatch> {
+    return apiFetch('/save/batch', { schema: saveBatchSchema })
+  },
+  addSaveOp(op: SaveOpInput): Promise<unknown> {
+    return apiFetch('/save/batch', { method: 'POST', body: JSON.stringify(op) })
+  },
+  removeSaveOp(id: string): Promise<unknown> {
+    return apiFetch(`/save/batch/${encodeURIComponent(id)}`, { method: 'DELETE' })
+  },
+  clearSaveBatch(): Promise<unknown> {
+    return apiFetch('/save/batch', { method: 'DELETE' })
+  },
+  applySaveBatch(): Promise<BatchApplyResult> {
+    return apiFetch('/save/batch/apply', { method: 'POST', schema: batchApplyResultSchema })
   },
 }

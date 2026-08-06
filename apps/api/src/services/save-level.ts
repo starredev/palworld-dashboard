@@ -20,7 +20,7 @@ import { findWorldSaveDir } from './save-teleport'
 // entry.value.RawData.value.object.SaveParameter.value. Values are wrapped as
 // { value, type } (sometimes doubly, e.g. ByteProperty/FixedPoint64).
 
-function levelSavPath(): string {
+export function levelSavPath(): string {
   return join(findWorldSaveDir(), 'Level.sav')
 }
 
@@ -263,7 +263,10 @@ export async function readPaldeck(): Promise<PaldeckOwner[]> {
 // ---- Writes (mutate the parsed Level.sav in place; run via editSaveFile) ----
 
 /** Locate the mutable SaveParameter dict of the matching player (a ref into json). */
-function findPlayerParamsRef(levelJson: unknown, uid: string): Record<string, unknown> | null {
+export function findPlayerParamsRef(
+  levelJson: unknown,
+  uid: string,
+): Record<string, unknown> | null {
   for (const entry of characterEntries(levelJson)) {
     const params = saveParam(entry)
     if (
@@ -423,7 +426,7 @@ export function applyPalEdit(params: Record<string, unknown>, input: PalEditInpu
 const hexOnly = (s: string) => s.replace(/[^0-9a-fA-F]/g, '').toLowerCase()
 
 /** Find a specific pal by owner uid + its InstanceId (a ref into json). */
-function findPalRef(
+export function findPalRef(
   levelJson: unknown,
   uid: string,
   instanceId: string,

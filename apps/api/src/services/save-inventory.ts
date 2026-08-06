@@ -187,6 +187,16 @@ async function editLevelWithItems(
   }
 }
 
+/** The GUID of a player's main (Common) inventory container, from their save. */
+export async function commonContainerGuid(uid: string): Promise<string> {
+  const path = playerSavePath(uid)
+  if (!existsSync(path)) throw new Error('Player save not found')
+  const inv = deepFind(await readSaveJson(path), 'InventoryInfo')
+  const guid = hex(dig(inv, 'value', 'CommonContainerId', 'value', 'ID', 'value'))
+  if (!guid) throw new Error('Could not resolve the player inventory container')
+  return guid
+}
+
 /** Give a player `count` of `staticId` (their common inventory container). */
 export async function giveItem(
   app: FastifyInstance,
@@ -194,10 +204,6 @@ export async function giveItem(
   staticId: string,
   count: number,
 ): Promise<void> {
-  const path = playerSavePath(uid)
-  if (!existsSync(path)) throw new Error('Player save not found')
-  const inv = deepFind(await readSaveJson(path), 'InventoryInfo')
-  const guid = hex(dig(inv, 'value', 'CommonContainerId', 'value', 'ID', 'value'))
-  if (!guid) throw new Error('Could not resolve the player inventory container')
+  const guid = await commonContainerGuid(uid)
   await editLevelWithItems(app, (json) => addItemToContainer(json, guid, staticId, count))
 }

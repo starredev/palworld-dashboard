@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { useMutation } from '@tanstack/vue-query'
 import { Loader2, Database, Utensils, ArrowUpNarrowWide, Gauge } from 'lucide-vue-next'
-import { Button, Input, ConfirmDialog } from '@tsuki/ui'
+import { Button, Input } from '@tsuki/ui'
 import type { PalPlayer, PalSummary, PlayerStats } from '@tsuki/types'
 import { api } from '@/lib/api'
+import { useQueueOp } from '@/composables/use-save-batch'
 import PalEditDialog from './PalEditDialog.vue'
 import PlayerInventory from './PlayerInventory.vue'
 import PlayerStatsDialog from './PlayerStatsDialog.vue'
@@ -50,28 +50,20 @@ watch(
   },
 )
 
-// One confirm dialog drives both writes (each restarts the server).
-type Pending = { label: string; run: () => Promise<unknown> } | null
-const pending = ref<Pending>(null)
-
-const write = useMutation({
-  mutationFn: () => pending.value!.run(),
-  onSuccess: async () => {
-    pending.value = null
-    await load()
-  },
-})
+// Quick actions queue into the shared batch (applied together, one restart).
+const queue = useQueueOp()
+const name = computed(() => props.player?.name ?? 'player')
 
 function askRefuel(): void {
   const uid = props.player?.playerId
   if (!uid) return
-  pending.value = { label: 'restore hunger & sanity', run: () => api.refuelPlayer(uid) }
+  queue.mutate({ type: 'refuel', uid, label: `Refuel ${name.value}` })
 }
 function askSetLevel(): void {
   const uid = props.player?.playerId
   const lvl = Number(levelInput.value)
   if (!uid || !Number.isInteger(lvl) || lvl < 1 || lvl > 100) return
-  pending.value = { label: `set level to ${lvl}`, run: () => api.setPlayerLevel(uid, lvl) }
+  queue.mutate({ type: 'playerLevel', uid, label: `Set ${name.value} to level ${lvl}`, level: lvl })
 }
 
 const rows = computed(() => {
@@ -139,7 +131,7 @@ const rows = computed(() => {
 
         <!-- Quick actions (admin) -->
         <div v-if="canEdit" class="mt-5 flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" :disabled="write.isPending.value" @click="askRefuel">
+          <Button variant="outline" size="sm" :disabled="queue.isPending.value" @click="askRefuel">
             <Utensils /> Refuel
           </Button>
           <Button variant="outline" size="sm" @click="editingStats = true">
@@ -150,7 +142,7 @@ const rows = computed(() => {
             <Button
               variant="outline"
               size="sm"
-              :disabled="write.isPending.value"
+              :disabled="queue.isPending.value"
               @click="askSetLevel"
             >
               <ArrowUpNarrowWide /> Set level
@@ -159,17 +151,6 @@ const rows = computed(() => {
         </div>
       </template>
     </template>
-
-    <ConfirmDialog
-      :open="pending !== null"
-      title="Edit save and restart?"
-      :description="`This will ${pending?.label ?? 'edit the save'} for ${player?.name ?? 'this player'}. The server restarts and everyone disconnects briefly. A backup is taken first.`"
-      tone="destructive"
-      confirm-label="Apply & restart"
-      :loading="write.isPending.value"
-      @update:open="(v: boolean) => !v && (pending = null)"
-      @confirm="write.mutate()"
-    />
 
     <PalEditDialog
       :pal="editingPal"
