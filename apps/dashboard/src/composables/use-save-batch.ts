@@ -1,5 +1,6 @@
 import { computed } from 'vue'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/vue-query'
+import { toast } from '@tsuki/ui'
 import type { SaveOpInput } from '@tsuki/types'
 import { api } from '@/lib/api'
 import { useAuthStore } from '@/stores/auth'
@@ -10,7 +11,12 @@ export function useQueueOp() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (op: SaveOpInput) => api.addSaveOp(op),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['saveBatch'] }),
+    onSuccess: (_data, op) => {
+      qc.invalidateQueries({ queryKey: ['saveBatch'] })
+      toast.success('Added to batch', op.label)
+    },
+    onError: (e: unknown) =>
+      toast.error('Could not queue edit', (e as Error)?.message ?? 'Unknown error'),
   })
 }
 
@@ -33,15 +39,33 @@ export function useSaveBatch() {
   const remove = useMutation({
     mutationFn: (id: string) => api.removeSaveOp(id),
     onSuccess: invalidate,
+    onError: (e: unknown) =>
+      toast.error('Could not remove edit', (e as Error)?.message ?? 'Unknown error'),
   })
-  const clear = useMutation({ mutationFn: () => api.clearSaveBatch(), onSuccess: invalidate })
+  const clear = useMutation({
+    mutationFn: () => api.clearSaveBatch(),
+    onSuccess: () => {
+      invalidate()
+      toast.info('Batch cleared')
+    },
+  })
   const apply = useMutation({
     mutationFn: () => api.applySaveBatch(),
-    onSuccess: () => {
+    onSuccess: (r) => {
       invalidate()
       // Refresh everything the edits may have changed (players, stats, inventory…).
       qc.invalidateQueries()
+      // Partial failures keep the detailed result panel in SaveBatchBar; only
+      // toast the clean-success case here to avoid a double notification.
+      if (!r.failed.length) {
+        toast.success(
+          `Applied ${r.applied} change${r.applied === 1 ? '' : 's'}`,
+          'Server restarted.',
+        )
+      }
     },
+    onError: (e: unknown) =>
+      toast.error('Apply failed', (e as Error)?.message ?? 'The server may not have restarted.'),
   })
 
   return { ops, enabled, remove, clear, apply }
