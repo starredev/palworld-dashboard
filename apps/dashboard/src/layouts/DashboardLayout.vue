@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { RouterView } from 'vue-router'
+import { Toaster } from '@tsuki/ui'
 import AppSidebar from '@/components/layout/AppSidebar.vue'
 import AppTopbar from '@/components/layout/AppTopbar.vue'
 import SaveBatchBar from '@/components/layout/SaveBatchBar.vue'
@@ -43,6 +44,7 @@ const { connected } = useRealtime()
     </div>
 
     <SaveBatchBar />
+    <Toaster />
   </div>
 </template>
 
