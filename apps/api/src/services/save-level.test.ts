@@ -8,6 +8,7 @@ import {
   parsePlayerStats,
   refuelPlayer,
   setPlayerLevel,
+  setPlayerStats,
 } from './save-level'
 
 // palworld-save-tools-shaped Level.sav CharacterSaveParameterMap entry.
@@ -192,6 +193,33 @@ describe('applyPalEdit', () => {
     expect((params.SanityValue as { value: number }).value).toBe(100)
     expect(params.WorkerSick).toBeUndefined()
     expect(params.PalReviveTimer).toBeUndefined()
+  })
+})
+
+describe('setPlayerStats', () => {
+  it('sets level/exp/nickname and allocated stat points (by Japanese name)', () => {
+    const params: Record<string, unknown> = {
+      Level: byteNode(20),
+      Exp: { value: 5000, type: 'Int64Property' },
+      NickName: { value: 'Old', type: 'StrProperty' },
+      GotStatusPointList: {
+        value: {
+          values: [
+            { StatusName: { value: '最大HP' }, StatusPoint: { value: 3 } },
+            { StatusName: { value: '攻撃力' }, StatusPoint: { value: 1 } },
+          ],
+        },
+      },
+    }
+    setPlayerStats(params, { level: 30, exp: 9999, nickName: 'New', health: 10, attack: 5 })
+    expect((params.Level as { value: { value: number } }).value.value).toBe(30)
+    expect((params.Exp as { value: number }).value).toBe(9999)
+    expect((params.NickName as { value: string }).value).toBe('New')
+    const list = (
+      params.GotStatusPointList as { value: { values: { StatusPoint: { value: number } }[] } }
+    ).value.values
+    expect(list[0].StatusPoint.value).toBe(10) // 最大HP
+    expect(list[1].StatusPoint.value).toBe(5) // 攻撃力
   })
 })
 

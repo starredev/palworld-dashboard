@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useMutation } from '@tanstack/vue-query'
-import { Loader2, Database, Utensils, ArrowUpNarrowWide } from 'lucide-vue-next'
+import { Loader2, Database, Utensils, ArrowUpNarrowWide, Gauge } from 'lucide-vue-next'
 import { Button, Input, ConfirmDialog } from '@tsuki/ui'
 import type { PalPlayer, PalSummary, PlayerStats } from '@tsuki/types'
 import { api } from '@/lib/api'
 import PalEditDialog from './PalEditDialog.vue'
 import PlayerInventory from './PlayerInventory.vue'
+import PlayerStatsDialog from './PlayerStatsDialog.vue'
+
+const editingStats = ref(false)
 
 const props = defineProps<{ player: PalPlayer | null; canEdit?: boolean }>()
 
@@ -139,6 +142,9 @@ const rows = computed(() => {
           <Button variant="outline" size="sm" :disabled="write.isPending.value" @click="askRefuel">
             <Utensils /> Refuel
           </Button>
+          <Button variant="outline" size="sm" @click="editingStats = true">
+            <Gauge /> Edit stats
+          </Button>
           <div class="flex items-center gap-1.5">
             <Input v-model="levelInput" type="number" class="w-20" placeholder="Lvl" />
             <Button
@@ -169,6 +175,14 @@ const rows = computed(() => {
       :pal="editingPal"
       :uid="player?.playerId ?? null"
       @close="editingPal = null"
+      @done="load"
+    />
+
+    <PlayerStatsDialog
+      :stats="editingStats ? stats : null"
+      :uid="player?.playerId ?? null"
+      :name="player?.name"
+      @close="editingStats = false"
       @done="load"
     />
   </div>

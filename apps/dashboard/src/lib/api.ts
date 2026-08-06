@@ -64,6 +64,7 @@ import {
   type SavePlayersResponse,
   type PaldeckResponse,
   type PalEditInput,
+  type PlayerStatsInput,
   type InventoryResponse,
   type Vec3,
 } from '@tsuki/types'
@@ -324,6 +325,13 @@ export const api = {
     return apiFetch(`/save/players/${encodeURIComponent(uid)}/level`, {
       method: 'POST',
       body: JSON.stringify({ level }),
+    }) as Promise<{ ok: boolean }>
+  },
+
+  editPlayerStats(uid: string, input: PlayerStatsInput): Promise<{ ok: boolean }> {
+    return apiFetch(`/save/players/${encodeURIComponent(uid)}/edit-stats`, {
+      method: 'POST',
+      body: JSON.stringify(input),
     }) as Promise<{ ok: boolean }>
   },
 

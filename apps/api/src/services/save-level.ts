@@ -6,7 +6,9 @@ import type {
   PaldeckOwner,
   PalEditInput,
   PlayerStats,
+  PlayerStatsInput,
   SavePlayer,
+  StatusPoints,
 } from '@tsuki/types'
 import { readSaveJson, isSaveEditorAvailable } from './save-editor'
 import { editSaveFile } from './save-edit'
@@ -94,7 +96,38 @@ function uidMatches(guid: unknown, uid: string): boolean {
   return a === b || (a.length >= 8 && b.length >= 8 && a.slice(0, 8) === b.slice(0, 8))
 }
 
-type Stats = Pick<PlayerStats, 'nickName' | 'level' | 'exp' | 'hp' | 'hunger' | 'sanity'>
+// The player's allocated stat points are stored under Japanese status names.
+const STATUS_JP: Record<keyof StatusPoints, string> = {
+  health: '最大HP',
+  stamina: '最大SP',
+  attack: '攻撃力',
+  weight: '所持重量',
+  captureRate: '捕獲率',
+  workSpeed: '作業速度',
+}
+
+function readStatusPoints(params: Record<string, unknown>): StatusPoints | null {
+  const arr = dig(params['GotStatusPointList'], 'value', 'values')
+  if (!Array.isArray(arr)) return null
+  const byJp: Record<string, number> = {}
+  for (const e of arr) {
+    const nm = dig(e, 'StatusName', 'value')
+    const pt = dig(e, 'StatusPoint', 'value')
+    if (typeof nm === 'string' && typeof pt === 'number') byJp[nm] = pt
+  }
+  const out = {} as StatusPoints
+  let any = false
+  for (const k of Object.keys(STATUS_JP) as (keyof StatusPoints)[]) {
+    const v = byJp[STATUS_JP[k]]
+    out[k] = typeof v === 'number' ? ((any = true), v) : null
+  }
+  return any ? out : null
+}
+
+type Stats = Pick<
+  PlayerStats,
+  'nickName' | 'level' | 'exp' | 'hp' | 'hunger' | 'sanity' | 'statusPoints'
+>
 
 /** Pure: extract a player's stats + owned pals from parsed Level.sav JSON. */
 export function parsePlayerStats(levelJson: unknown, uid: string): Omit<PlayerStats, 'available'> {
@@ -105,6 +138,7 @@ export function parsePlayerStats(levelJson: unknown, uid: string): Omit<PlayerSt
     hp: null,
     hunger: null,
     sanity: null,
+    statusPoints: null,
   }
   let stats: Stats | null = null
   const pals: PlayerStats['pals'] = []
@@ -121,6 +155,7 @@ export function parsePlayerStats(levelJson: unknown, uid: string): Omit<PlayerSt
           hp: hpVal(params),
           hunger: numVal(params['FullStomach']),
           sanity: numVal(params['SanityValue']),
+          statusPoints: readStatusPoints(params),
         }
       }
     } else if (uidMatches(dig(params['OwnerPlayerUId'], 'value'), uid)) {
@@ -276,6 +311,57 @@ export function setPlayerLevelInLevel(
   level: number,
 ): Promise<void> {
   return editPlayerInLevel(app, uid, (params) => setPlayerLevel(params, level))
+}
+
+/** Set one allocated stat point (matched by its Japanese status name). */
+function setStatusPoint(
+  params: Record<string, unknown>,
+  key: keyof StatusPoints,
+  value: number,
+): void {
+  const jp = STATUS_JP[key]
+  const arr = dig(params['GotStatusPointList'], 'value', 'values')
+  if (!Array.isArray(arr)) return
+  for (const e of arr) {
+    if (dig(e, 'StatusName', 'value') === jp) {
+      const sp = (e as Record<string, unknown>)['StatusPoint']
+      if (isVN(sp)) sp.value = value
+      return
+    }
+  }
+}
+
+/** Apply a player stats edit in place (level/exp/nickname + stat points). */
+export function setPlayerStats(params: Record<string, unknown>, input: PlayerStatsInput): void {
+  if (input.level !== undefined) setPlayerLevel(params, input.level)
+  if (input.exp !== undefined) {
+    const n = params['Exp']
+    if (isVN(n)) n.value = input.exp
+  }
+  if (input.nickName !== undefined) {
+    const n = params['NickName']
+    if (isVN(n)) n.value = input.nickName
+  }
+  const stats: (keyof StatusPoints)[] = [
+    'health',
+    'stamina',
+    'attack',
+    'weight',
+    'captureRate',
+    'workSpeed',
+  ]
+  for (const k of stats) {
+    const v = input[k]
+    if (v !== undefined) setStatusPoint(params, k, v)
+  }
+}
+
+export function editPlayerStatsInLevel(
+  app: FastifyInstance,
+  uid: string,
+  input: PlayerStatsInput,
+): Promise<void> {
+  return editPlayerInLevel(app, uid, (params) => setPlayerStats(params, input))
 }
 
 // ---- Pal edits (Level.sav) ----

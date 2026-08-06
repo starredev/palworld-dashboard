@@ -78,6 +78,17 @@ export type PalEditInput = z.infer<typeof palEditInputSchema>
  * CharacterSaveParameterMap. `found` is false when no matching player record
  * exists (e.g. brand-new player). Reading this decodes the whole Level.sav.
  */
+/** Allocated stat points (the ones spent on level-up). Null when absent. */
+export const statusPointsSchema = z.object({
+  health: z.number().nullable(),
+  stamina: z.number().nullable(),
+  attack: z.number().nullable(),
+  weight: z.number().nullable(),
+  captureRate: z.number().nullable(),
+  workSpeed: z.number().nullable(),
+})
+export type StatusPoints = z.infer<typeof statusPointsSchema>
+
 export const playerStatsSchema = z.object({
   available: z.boolean(),
   found: z.boolean(),
@@ -87,9 +98,26 @@ export const playerStatsSchema = z.object({
   hp: z.number().nullable(),
   hunger: z.number().nullable(),
   sanity: z.number().nullable(),
+  statusPoints: statusPointsSchema.nullable(),
   pals: z.array(palSummarySchema),
 })
 export type PlayerStats = z.infer<typeof playerStatsSchema>
+
+/** Edit a player's stats (all optional; at least one required). */
+export const playerStatsInputSchema = z
+  .object({
+    level: z.number().int().min(1).max(100).optional(),
+    exp: z.number().int().min(0).optional(),
+    nickName: z.string().min(1).max(64).optional(),
+    health: z.number().int().min(0).max(9999).optional(),
+    stamina: z.number().int().min(0).max(9999).optional(),
+    attack: z.number().int().min(0).max(9999).optional(),
+    weight: z.number().int().min(0).max(9999).optional(),
+    captureRate: z.number().int().min(0).max(9999).optional(),
+    workSpeed: z.number().int().min(0).max(9999).optional(),
+  })
+  .refine((v) => Object.values(v).some((x) => x !== undefined), { message: 'Nothing to change' })
+export type PlayerStatsInput = z.infer<typeof playerStatsInputSchema>
 
 /** A player's inventory, resolved from the save's item containers (read-only). */
 export const inventoryItemSchema = z.object({ id: z.string(), count: z.number() })

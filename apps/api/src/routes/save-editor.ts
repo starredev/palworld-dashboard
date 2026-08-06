@@ -3,6 +3,7 @@ import {
   teleportInputSchema,
   techPointsInputSchema,
   playerLevelInputSchema,
+  playerStatsInputSchema,
   palEditInputSchema,
   type LevelSummary,
   type PlayerDetail,
@@ -22,6 +23,7 @@ import { giveTechPoints, readPlayerDetail } from '../services/save-player-fields
 import { isInventoryAvailable, readInventory } from '../services/save-inventory'
 import {
   editPalInLevel,
+  editPlayerStatsInLevel,
   isLevelAvailable,
   readLevelPlayers,
   readLevelSummary,
@@ -206,6 +208,30 @@ export async function saveEditorRoutes(app: FastifyInstance): Promise<void> {
       }
       try {
         await refuelPlayerInLevel(app, req.params.uid)
+        return { ok: true }
+      } catch (error) {
+        reply.log.error(error)
+        return reply.status(500).send({ message: (error as Error).message })
+      }
+    },
+  )
+
+  // Write (Level.sav): edit a player's stats (level/exp/nickname + stat points).
+  app.post<{ Params: UidParams }>(
+    '/save/players/:uid/edit-stats',
+    { preHandler: requireAdmin },
+    async (req, reply) => {
+      if (!isSaveEditAvailable() || !isLevelAvailable()) {
+        return reply.status(503).send({ message: 'Level.sav editing is not available' })
+      }
+      const parsed = playerStatsInputSchema.safeParse(req.body)
+      if (!parsed.success) {
+        return reply
+          .status(400)
+          .send({ message: parsed.error.issues[0]?.message ?? 'Invalid body' })
+      }
+      try {
+        await editPlayerStatsInLevel(app, req.params.uid, parsed.data)
         return { ok: true }
       } catch (error) {
         reply.log.error(error)
