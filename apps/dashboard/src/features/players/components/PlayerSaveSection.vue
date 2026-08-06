@@ -6,6 +6,7 @@ import { Button, Input, ConfirmDialog } from '@tsuki/ui'
 import type { PalPlayer, PalSummary, PlayerStats } from '@tsuki/types'
 import { api } from '@/lib/api'
 import PalEditDialog from './PalEditDialog.vue'
+import PlayerInventory from './PlayerInventory.vue'
 
 const props = defineProps<{ player: PalPlayer | null; canEdit?: boolean }>()
 
@@ -130,6 +131,8 @@ const rows = computed(() => {
             </div>
           </div>
         </div>
+
+        <PlayerInventory :uid="player?.playerId ?? null" />
 
         <!-- Quick actions (admin) -->
         <div v-if="canEdit" class="mt-5 flex flex-wrap items-center gap-2">

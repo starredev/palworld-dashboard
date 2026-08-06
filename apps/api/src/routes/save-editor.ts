@@ -8,6 +8,7 @@ import {
   type PlayerDetail,
   type PlayerLocation,
   type PlayerStats,
+  type InventoryResponse,
   type PaldeckResponse,
   type SaveEditorStatus,
   type SavePlayersResponse,
@@ -18,6 +19,7 @@ import { isSaveEditorAvailable } from '../services/save-editor'
 import { isSaveEditAvailable } from '../services/save-edit'
 import { readPlayerLocation, teleportPlayer } from '../services/save-teleport'
 import { giveTechPoints, readPlayerDetail } from '../services/save-player-fields'
+import { isInventoryAvailable, readInventory } from '../services/save-inventory'
 import {
   editPalInLevel,
   isLevelAvailable,
@@ -108,6 +110,24 @@ export async function saveEditorRoutes(app: FastifyInstance): Promise<void> {
       }
       try {
         return { available: true, players: await readLevelPlayers() }
+      } catch (error) {
+        reply.log.error(error)
+        return reply.status(400).send({ message: (error as Error).message })
+      }
+    },
+  )
+
+  // Read-only: a player's inventory items (player-file container GUIDs resolved
+  // into Level.sav item slots, with the item-slot decoder enabled for the read).
+  app.get<{ Params: UidParams }>(
+    '/save/players/:uid/inventory',
+    { preHandler: authenticate },
+    async (req, reply): Promise<InventoryResponse> => {
+      if (!isInventoryAvailable() || !isLevelAvailable()) {
+        return reply.status(503).send({ message: 'Inventory reading is not available' })
+      }
+      try {
+        return { available: true, ...(await readInventory(req.params.uid)) }
       } catch (error) {
         reply.log.error(error)
         return reply.status(400).send({ message: (error as Error).message })

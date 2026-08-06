@@ -91,6 +91,20 @@ export const playerStatsSchema = z.object({
 })
 export type PlayerStats = z.infer<typeof playerStatsSchema>
 
+/** A player's inventory, resolved from the save's item containers (read-only). */
+export const inventoryItemSchema = z.object({ id: z.string(), count: z.number() })
+export type InventoryItem = z.infer<typeof inventoryItemSchema>
+
+export const inventoryContainerSchema = z.object({
+  name: z.string(),
+  items: z.array(inventoryItemSchema),
+})
+export const inventoryResponseSchema = z.object({
+  available: z.boolean(),
+  containers: z.array(inventoryContainerSchema),
+})
+export type InventoryResponse = z.infer<typeof inventoryResponseSchema>
+
 /** A player as listed from the save itself (works for offline players too). */
 export const savePlayerSchema = z.object({
   uid: z.string(),

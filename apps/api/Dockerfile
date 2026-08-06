@@ -67,6 +67,13 @@ RUN mkdir -p /opt/palworld-save-tools /tmp/hostfix \
        /opt/palworld-save-tools/palworld_save_tools/rawdata/ \
  && rm -rf /tmp/pst.tar.gz /tmp/hostfix.tar.gz /tmp/hostfix
 
+# Read-only inventory support: a corrected item-slot decoder (reads item id +
+# count, which cheahjs/quadrantbs don't) + a convert script that enables it.
+# Only used for inventory reads; save writes leave the slots disabled/raw.
+COPY apps/api/vendor/item_container_slots.py \
+     /opt/palworld-save-tools/palworld_save_tools/rawdata/item_container_slots.py
+COPY apps/api/vendor/convert_with_items.py /opt/palworld-save-tools/convert_with_items.py
+
 # Own the backups mount point as `node` so the named volume is seeded with
 # node:node ownership (Docker copies the image dir's perms into a fresh volume),
 # letting the non-root process write save backups.
