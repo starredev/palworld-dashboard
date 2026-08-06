@@ -85,6 +85,20 @@ export const savePlayersResponseSchema = z.object({
 })
 export type SavePlayersResponse = z.infer<typeof savePlayersResponseSchema>
 
+/** A player and the (base) species they own — joined with the dex data client-side. */
+export const paldeckOwnerSchema = z.object({
+  uid: z.string(),
+  name: z.string().nullable(),
+  species: z.array(z.string()),
+})
+export type PaldeckOwner = z.infer<typeof paldeckOwnerSchema>
+
+export const paldeckResponseSchema = z.object({
+  available: z.boolean(),
+  owners: z.array(paldeckOwnerSchema),
+})
+export type PaldeckResponse = z.infer<typeof paldeckResponseSchema>
+
 /** Count of player vs pal records in Level.sav — a cheap decode health check. */
 export const levelSummarySchema = z.object({
   available: z.boolean(),

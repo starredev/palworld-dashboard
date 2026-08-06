@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 import type { FastifyInstance } from 'fastify'
-import type { LevelSummary, PlayerStats, SavePlayer } from '@tsuki/types'
+import type { LevelSummary, PaldeckOwner, PlayerStats, SavePlayer } from '@tsuki/types'
 import { readSaveJson, isSaveEditorAvailable } from './save-editor'
 import { editSaveFile } from './save-edit'
 import { deepFind } from './save-location'
@@ -173,6 +173,41 @@ export function parseLevelPlayers(levelJson: unknown): SavePlayer[] {
 /** List all players from Level.sav (drives the save editor for offline players). */
 export async function readLevelPlayers(): Promise<SavePlayer[]> {
   return parseLevelPlayers(await readSaveJson(levelSavPath()))
+}
+
+/** Strip runtime prefixes so a CharacterID matches the paldeck dataset codename. */
+function baseSpecies(id: string): string {
+  return id.replace(/^(BOSS_|PREDATOR_|GYM_|SUMMON_)/i, '')
+}
+
+/** Pure: which species (deduped) each player owns — for the Paldeck page. */
+export function parsePaldeck(levelJson: unknown): PaldeckOwner[] {
+  const names = new Map<string, string | null>()
+  const owned = new Map<string, Set<string>>()
+  for (const entry of characterEntries(levelJson)) {
+    const params = saveParam(entry)
+    if (!params) continue
+    if (isPlayerParams(params)) {
+      const g = dig(entry, 'key', 'PlayerUId', 'value')
+      if (typeof g === 'string') names.set(normUid(g).toUpperCase(), strVal(params['NickName']))
+    } else {
+      const g = dig(params['OwnerPlayerUId'], 'value')
+      const species = strVal(params['CharacterID'])
+      if (typeof g === 'string' && species) {
+        const uid = normUid(g).toUpperCase()
+        if (!owned.has(uid)) owned.set(uid, new Set())
+        owned.get(uid)!.add(baseSpecies(species))
+      }
+    }
+  }
+  const owners: PaldeckOwner[] = []
+  for (const [uid, name] of names) owners.push({ uid, name, species: [...(owned.get(uid) ?? [])] })
+  return owners.sort((a, b) => b.species.length - a.species.length)
+}
+
+/** Owned species per player, from Level.sav (frontend joins with the dex data). */
+export async function readPaldeck(): Promise<PaldeckOwner[]> {
+  return parsePaldeck(await readSaveJson(levelSavPath()))
 }
 
 // ---- Writes (mutate the parsed Level.sav in place; run via editSaveFile) ----

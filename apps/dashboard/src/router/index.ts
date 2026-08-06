@@ -38,6 +38,12 @@ const routes: RouteRecordRaw[] = [
         meta: { title: 'Pals' },
       },
       {
+        path: 'paldeck',
+        name: 'paldeck',
+        component: () => import('@/features/paldeck/pages/PaldeckPage.vue'),
+        meta: { title: 'Paldeck' },
+      },
+      {
         path: 'map',
         name: 'map',
         component: () => import('@/features/map/pages/MapPage.vue'),

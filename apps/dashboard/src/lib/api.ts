@@ -22,6 +22,7 @@ import {
   playerLocationSchema,
   playerStatsSchema,
   savePlayersResponseSchema,
+  paldeckResponseSchema,
   healthResponseSchema,
   palServerInfoSchema,
   palServerMetricsSchema,
@@ -60,6 +61,7 @@ import {
   type PlayerLocation,
   type PlayerStats,
   type SavePlayersResponse,
+  type PaldeckResponse,
   type Vec3,
 } from '@tsuki/types'
 import { apiFetch, apiUrl } from './http'
@@ -293,6 +295,10 @@ export const api = {
 
   getSavePlayers(): Promise<SavePlayersResponse> {
     return apiFetch('/save/players', { schema: savePlayersResponseSchema })
+  },
+
+  getPaldeck(): Promise<PaldeckResponse> {
+    return apiFetch('/save/paldeck', { schema: paldeckResponseSchema })
   },
 
   getPlayerStats(uid: string): Promise<PlayerStats> {

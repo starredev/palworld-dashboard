@@ -7,6 +7,7 @@ import {
   type PlayerDetail,
   type PlayerLocation,
   type PlayerStats,
+  type PaldeckResponse,
   type SaveEditorStatus,
   type SavePlayersResponse,
 } from '@tsuki/types'
@@ -20,6 +21,7 @@ import {
   isLevelAvailable,
   readLevelPlayers,
   readLevelSummary,
+  readPaldeck,
   readPlayerStats,
   refuelPlayerInLevel,
   setPlayerLevelInLevel,
@@ -104,6 +106,23 @@ export async function saveEditorRoutes(app: FastifyInstance): Promise<void> {
       }
       try {
         return { available: true, players: await readLevelPlayers() }
+      } catch (error) {
+        reply.log.error(error)
+        return reply.status(400).send({ message: (error as Error).message })
+      }
+    },
+  )
+
+  // Read-only: which species each player owns (Paldeck page joins with the dex).
+  app.get(
+    '/save/paldeck',
+    { preHandler: authenticate },
+    async (_req, reply): Promise<PaldeckResponse> => {
+      if (!isLevelAvailable()) {
+        return reply.status(503).send({ message: 'Level.sav is not available' })
+      }
+      try {
+        return { available: true, owners: await readPaldeck() }
       } catch (error) {
         reply.log.error(error)
         return reply.status(400).send({ message: (error as Error).message })

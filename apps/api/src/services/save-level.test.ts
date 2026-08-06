@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   parseLevelPlayers,
   parseLevelSummary,
+  parsePaldeck,
   parsePlayerStats,
   refuelPlayer,
   setPlayerLevel,
@@ -139,6 +140,21 @@ describe('parseLevelPlayers', () => {
       { uid: 'A87A257D000000000000000000000000', name: 'Invisiouz', level: 24 }, // sorted by level desc
       { uid: MELVIN, name: 'Melvin265', level: 23 },
     ])
+  })
+})
+
+describe('parsePaldeck', () => {
+  it('groups deduped, prefix-stripped species per owner', () => {
+    const json = levelJson([
+      entry({ isPlayer: true, playerUid: MELVIN_GUID, nick: 'Melvin265' }),
+      entry({ species: 'BOSS_KingAlpaca', ownerUid: MELVIN_GUID }), // BOSS_ stripped
+      entry({ species: 'KingAlpaca', ownerUid: MELVIN_GUID }), // dedupes with the above
+      entry({ species: 'Foxparks', ownerUid: MELVIN_GUID }),
+    ])
+    const owners = parsePaldeck(json)
+    expect(owners).toHaveLength(1)
+    expect(owners[0].uid).toBe(MELVIN)
+    expect([...owners[0].species].sort()).toEqual(['Foxparks', 'KingAlpaca'])
   })
 })
 
