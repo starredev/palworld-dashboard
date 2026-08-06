@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { X, Users } from 'lucide-vue-next'
+import { RouterLink } from 'vue-router'
+import { X, Users, MapPin } from 'lucide-vue-next'
 
 export interface PalEntry {
   dex: number
@@ -81,6 +82,13 @@ const icon = (id: string) => `https://palworld.gg/images/full_palicon/T_${id}_ic
           <p v-if="pal.desc" class="mt-4 text-xs leading-relaxed text-muted-foreground">
             {{ pal.desc }}
           </p>
+
+          <RouterLink
+            :to="{ path: '/map', query: { species: pal.id } }"
+            class="mt-3 inline-flex items-center gap-1.5 text-xs text-primary hover:underline"
+          >
+            <MapPin class="size-3.5" /> Show where they are on the map
+          </RouterLink>
 
           <!-- Base stats -->
           <dl class="mt-4 grid grid-cols-3 gap-2 text-center">
