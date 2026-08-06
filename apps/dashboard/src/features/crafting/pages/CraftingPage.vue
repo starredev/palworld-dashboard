@@ -6,11 +6,13 @@ import { Input } from '@tsuki/ui'
 import recipesData from '../recipes.json'
 import dropsData from '../drops.json'
 import namesData from '../names.json'
+import sourcesData from '../sources.json'
 
 type Recipe = { n: string; a: number; m: [string, number][] }
 const recipes = recipesData as Record<string, Recipe>
 const drops = dropsData as Record<string, [string, string][]>
 const names = namesData as Record<string, string>
+const sources = sourcesData as Record<string, string>
 
 const name = (id: string) => names[id] ?? recipes[id]?.n ?? id.replace(/_/g, ' ')
 
@@ -163,9 +165,9 @@ const rawMaterials = computed(() => {
                   +{{ m.droppers.length - 8 }}
                 </span>
               </template>
-              <span v-else class="text-xs text-muted-foreground/70"
-                >Gathered / mined in the world</span
-              >
+              <span v-else class="text-xs text-muted-foreground/70">
+                {{ sources[m.id] ?? 'Gathered in the world' }}
+              </span>
             </div>
           </div>
         </div>
