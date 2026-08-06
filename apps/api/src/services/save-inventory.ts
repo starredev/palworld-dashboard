@@ -1,11 +1,15 @@
 import { execFile } from 'node:child_process'
 import { existsSync, rmSync } from 'node:fs'
-import { readFile } from 'node:fs/promises'
+import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { promisify } from 'node:util'
+import type { FastifyInstance } from 'fastify'
 import type { InventoryResponse } from '@tsuki/types'
 import { loadEnv } from '../config/env'
-import { isSaveEditorAvailable, readSaveJson } from './save-editor'
+import { createBackup } from './backups'
+import { startContainer, stopContainer } from './container-control'
+import { isSaveEditAvailable } from './save-edit'
+import { isSaveEditorAvailable, jsonToSav, readSaveJson } from './save-editor'
 import { deepFind } from './save-location'
 import { findWorldSaveDir, playerSavePath } from './save-teleport'
 
@@ -93,4 +97,107 @@ export async function readInventory(uid: string): Promise<Omit<InventoryResponse
   }).filter((c) => c.items.length > 0)
 
   return { containers }
+}
+
+// ---- Give items (write) ----
+
+interface SlotRaw {
+  count: number
+  item: { static_id: string }
+}
+function slotRaw(slot: unknown): SlotRaw | null {
+  const raw = dig(slot, 'RawData', 'value')
+  return raw && typeof raw === 'object' && typeof (raw as SlotRaw).count === 'number'
+    ? (raw as SlotRaw)
+    : null
+}
+
+/**
+ * Add `count` of `staticId` to the container with GUID `guidHex`. Stacks onto an
+ * existing slot of that item, else fills an empty ("None") slot in place. Throws
+ * if the container isn't found or is full. Returns the mutated levelJson.
+ */
+export function addItemToContainer(
+  levelJson: unknown,
+  guidHex: string,
+  staticId: string,
+  count: number,
+): void {
+  const entries = dig(deepFind(levelJson, 'ItemContainerSaveData'), 'value')
+  const entry = Array.isArray(entries)
+    ? entries.find((e) => hex(dig(e, 'key', 'ID', 'value')) === guidHex)
+    : undefined
+  const slots = dig(entry, 'value', 'Slots', 'value', 'values')
+  if (!Array.isArray(slots)) throw new Error('Inventory container not found')
+
+  for (const slot of slots) {
+    const raw = slotRaw(slot)
+    if (raw && raw.item.static_id === staticId) {
+      raw.count += count
+      return
+    }
+  }
+  for (const slot of slots) {
+    const raw = slotRaw(slot)
+    if (raw && raw.item.static_id === 'None') {
+      raw.item.static_id = staticId
+      raw.count = count
+      return
+    }
+  }
+  throw new Error('Inventory is full (no free slot)')
+}
+
+/**
+ * Edit Level.sav with the item-slot decoder/encoder ENABLED (so item slots can
+ * be changed), through the safe pipeline: stop → backup → decode → mutate →
+ * re-encode → start. Only for item writes; other writes leave slots raw.
+ */
+async function editLevelWithItems(
+  app: FastifyInstance,
+  mutate: (levelJson: unknown) => void,
+): Promise<void> {
+  if (!isInventoryAvailable() || !isSaveEditAvailable()) {
+    throw new Error('Inventory editing needs the converter and Docker container control')
+  }
+  const env = loadEnv()
+  const sav = levelSavPath()
+  const jsonPath = `${sav}.json`
+
+  app.log.info('inventory edit: stopping the game container')
+  await stopContainer()
+  try {
+    createBackup('pre-edit')
+    if (existsSync(jsonPath)) rmSync(jsonPath)
+    await run(env.PYTHON_BIN, [convertScript(), sav, jsonPath], {
+      cwd: env.SAVE_TOOLS_DIR,
+      maxBuffer: 256 * 1024 * 1024,
+    })
+    try {
+      const json = JSON.parse(await readFile(jsonPath, 'utf8'))
+      mutate(json)
+      await writeFile(jsonPath, JSON.stringify(json))
+      await jsonToSav(jsonPath) // default convert re-encodes decoded slots via our encode
+    } finally {
+      if (existsSync(jsonPath)) rmSync(jsonPath)
+    }
+  } finally {
+    app.log.info('inventory edit: starting the game container')
+    await startContainer()
+  }
+}
+
+/** Give a player `count` of `staticId` (their common inventory container). */
+export async function giveItem(
+  app: FastifyInstance,
+  uid: string,
+  staticId: string,
+  count: number,
+): Promise<void> {
+  const path = playerSavePath(uid)
+  if (!existsSync(path)) throw new Error('Player save not found')
+  const inv = deepFind(await readSaveJson(path), 'InventoryInfo')
+  const guid = hex(dig(inv, 'value', 'CommonContainerId', 'value', 'ID', 'value'))
+  if (!guid) throw new Error('Could not resolve the player inventory container')
+  await editLevelWithItems(app, (json) => addItemToContainer(json, guid, staticId, count))
 }

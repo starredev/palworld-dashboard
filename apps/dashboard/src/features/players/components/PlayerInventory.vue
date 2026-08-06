@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
-import { Loader2, Backpack } from 'lucide-vue-next'
-import { Button } from '@tsuki/ui'
+import { computed, ref, watch } from 'vue'
+import { useMutation } from '@tanstack/vue-query'
+import { Loader2, Backpack, Gift } from 'lucide-vue-next'
+import { Button, Input, ConfirmDialog } from '@tsuki/ui'
 import type { InventoryResponse } from '@tsuki/types'
 import { api } from '@/lib/api'
 
-const props = defineProps<{ uid: string | null }>()
+const props = defineProps<{ uid: string | null; canEdit?: boolean }>()
 
 const data = ref<InventoryResponse | null>(null)
 const loading = ref(false)
@@ -65,6 +66,44 @@ const CAT_COLOR: Record<string, string> = {
   Blueprint: '#22d3ee',
 }
 const catColor = (id: string) => CAT_COLOR[meta(id)?.c ?? 'Material'] ?? '#71717a'
+
+// ---- Give item ----
+const giveSearch = ref('')
+const givePicked = ref<{ id: string; n: string } | null>(null)
+const giveCount = ref(1)
+const showList = ref(false)
+const confirming = ref(false)
+
+const giveMatches = computed(() => {
+  const q = giveSearch.value.trim().toLowerCase()
+  if (q.length < 2) return []
+  const out: { id: string; n: string }[] = []
+  for (const [id, m] of Object.entries(items.value)) {
+    if (m.n.toLowerCase().includes(q)) out.push({ id, n: m.n })
+    if (out.length >= 12) break
+  }
+  return out
+})
+function pickGive(m: { id: string; n: string }): void {
+  givePicked.value = m
+  giveSearch.value = m.n
+  showList.value = false
+}
+
+const give = useMutation({
+  mutationFn: () =>
+    api.giveItem(props.uid!, {
+      staticId: givePicked.value!.id,
+      count: Math.max(1, giveCount.value),
+    }),
+  onSuccess: async () => {
+    confirming.value = false
+    givePicked.value = null
+    giveSearch.value = ''
+    giveCount.value = 1
+    await load()
+  },
+})
 </script>
 
 <template>
@@ -102,6 +141,58 @@ const catColor = (id: string) => CAT_COLOR[meta(id)?.c ?? 'Material'] ?? '#71717
           </div>
         </div>
       </div>
+
+      <!-- Give item (admin) -->
+      <div v-if="canEdit" class="mt-4 border-t border-border pt-3">
+        <p class="mb-1.5 text-xs font-medium text-muted-foreground">Give item</p>
+        <div class="flex flex-wrap items-center gap-2">
+          <div class="relative min-w-[12rem] flex-1">
+            <Input
+              v-model="giveSearch"
+              placeholder="Search an item…"
+              @focus="showList = true"
+              @input="showList = true"
+            />
+            <div
+              v-if="showList && giveMatches.length"
+              class="absolute z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-lg border border-border bg-card py-1 shadow-xl"
+            >
+              <button
+                v-for="m in giveMatches"
+                :key="m.id"
+                type="button"
+                class="block w-full px-3 py-1.5 text-left text-xs hover:bg-accent"
+                @click="pickGive(m)"
+              >
+                {{ m.n }}
+              </button>
+            </div>
+          </div>
+          <Input v-model.number="giveCount" type="number" min="1" class="w-20" />
+          <Button
+            variant="outline"
+            size="sm"
+            :disabled="!givePicked || give.isPending.value"
+            @click="confirming = true"
+          >
+            <Gift /> Give
+          </Button>
+        </div>
+        <p v-if="give.isError.value" class="mt-2 text-xs text-red-400">
+          {{ (give.error.value as Error)?.message ?? 'Failed to give item.' }}
+        </p>
+      </div>
     </template>
+
+    <ConfirmDialog
+      :open="confirming"
+      title="Give item and restart?"
+      :description="`Give ${giveCount}× ${givePicked?.n ?? 'item'} — this stops the server, edits the save and restarts it. A backup is taken first.`"
+      tone="destructive"
+      confirm-label="Give & restart"
+      :loading="give.isPending.value"
+      @update:open="(v: boolean) => !v && (confirming = false)"
+      @confirm="give.mutate()"
+    />
   </div>
 </template>

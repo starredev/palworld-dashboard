@@ -1,9 +1,11 @@
-# Read-only replacement for palworld-save-tools' item_container_slots decoder,
-# API-compatible with cheahjs v0.24.0. cheahjs/quadrantbs only decode the
-# container "permission" data; the post-"memory optimisation" saves pack the
-# real item id + stack count into the slot RawData, so this reads those fields.
-# Enabled ONLY for inventory reads (see convert_with_items.py) — for save writes
-# the property stays disabled and slots round-trip as raw bytes.
+# Item-container SLOT decoder/encoder, API-compatible with cheahjs
+# palworld-save-tools v0.24.0. cheahjs/quadrantbs only decode the container
+# "permission" data; post-"memory optimisation" saves pack the real item id +
+# stack count into the slot RawData, so this reads/writes those fields (matching
+# the oMaN-Rod fork, ported to the v0.24.0 archive API — no coerce_bytes /
+# without_custom_type helpers which don't exist here). Registered as a
+# (decode, encode) pair; only enabled for inventory reads/gives — normal save
+# writes leave the property disabled and slots round-trip as raw bytes.
 from typing import Any, Optional, Sequence
 
 from palworld_save_tools.archive import *
@@ -37,6 +39,23 @@ def decode_bytes(
     }
 
 
-def encode(writer: Any, property_type: str, properties: dict[str, Any]) -> int:
-    # Read-only: writes never enable this property, so this must never run.
-    raise NotImplementedError("item_container_slots.encode is read-only here")
+def encode(writer: FArchiveWriter, property_type: str, properties: dict[str, Any]) -> int:
+    if property_type != "ArrayProperty":
+        raise Exception(f"Expected ArrayProperty, got {property_type}")
+    del properties["custom_type"]
+    encoded_bytes = encode_bytes(properties["value"])
+    properties["value"] = {"values": [b for b in encoded_bytes]}
+    return writer.property_inner(property_type, properties)
+
+
+def encode_bytes(p: Optional[dict[str, Any]]) -> bytes:
+    if p is None:
+        return bytes()
+    writer = FArchiveWriter()
+    writer.i32(p["slot_index"])
+    writer.i32(p["count"])
+    writer.fstring(p["item"]["static_id"])
+    writer.guid(p["item"]["dynamic_id"]["created_world_id"])
+    writer.guid(p["item"]["dynamic_id"]["local_id_in_created_world"])
+    writer.write(bytes(p["trailing_bytes"]))
+    return writer.bytes()

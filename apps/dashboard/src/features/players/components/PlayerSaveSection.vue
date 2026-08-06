@@ -135,7 +135,7 @@ const rows = computed(() => {
           </div>
         </div>
 
-        <PlayerInventory :uid="player?.playerId ?? null" />
+        <PlayerInventory :uid="player?.playerId ?? null" :can-edit="canEdit" />
 
         <!-- Quick actions (admin) -->
         <div v-if="canEdit" class="mt-5 flex flex-wrap items-center gap-2">

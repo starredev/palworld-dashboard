@@ -66,6 +66,7 @@ import {
   type PalEditInput,
   type PlayerStatsInput,
   type InventoryResponse,
+  type GiveItemInput,
   type Vec3,
 } from '@tsuki/types'
 import { apiFetch, apiUrl } from './http'
@@ -313,6 +314,13 @@ export const api = {
     return apiFetch(`/save/players/${encodeURIComponent(uid)}/inventory`, {
       schema: inventoryResponseSchema,
     })
+  },
+
+  giveItem(uid: string, input: GiveItemInput): Promise<{ ok: boolean }> {
+    return apiFetch(`/save/players/${encodeURIComponent(uid)}/give-item`, {
+      method: 'POST',
+      body: JSON.stringify(input),
+    }) as Promise<{ ok: boolean }>
   },
 
   refuelPlayer(uid: string): Promise<{ ok: boolean }> {

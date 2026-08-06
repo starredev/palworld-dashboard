@@ -9,6 +9,7 @@ import {
   type PlayerDetail,
   type PlayerLocation,
   type PlayerStats,
+  giveItemInputSchema,
   type InventoryResponse,
   type PaldeckResponse,
   type SaveEditorStatus,
@@ -20,7 +21,7 @@ import { isSaveEditorAvailable } from '../services/save-editor'
 import { isSaveEditAvailable } from '../services/save-edit'
 import { readPlayerLocation, teleportPlayer } from '../services/save-teleport'
 import { giveTechPoints, readPlayerDetail } from '../services/save-player-fields'
-import { isInventoryAvailable, readInventory } from '../services/save-inventory'
+import { giveItem, isInventoryAvailable, readInventory } from '../services/save-inventory'
 import {
   editPalInLevel,
   editPlayerStatsInLevel,
@@ -133,6 +134,28 @@ export async function saveEditorRoutes(app: FastifyInstance): Promise<void> {
       } catch (error) {
         reply.log.error(error)
         return reply.status(400).send({ message: (error as Error).message })
+      }
+    },
+  )
+
+  // Write (Level.sav, items enabled): give a player an item.
+  app.post<{ Params: UidParams }>(
+    '/save/players/:uid/give-item',
+    { preHandler: requireAdmin },
+    async (req, reply) => {
+      if (!isInventoryAvailable() || !isSaveEditAvailable() || !isLevelAvailable()) {
+        return reply.status(503).send({ message: 'Inventory editing is not available' })
+      }
+      const parsed = giveItemInputSchema.safeParse(req.body)
+      if (!parsed.success) {
+        return reply.status(400).send({ message: 'A valid item id and count are required' })
+      }
+      try {
+        await giveItem(app, req.params.uid, parsed.data.staticId, parsed.data.count)
+        return { ok: true }
+      } catch (error) {
+        reply.log.error(error)
+        return reply.status(500).send({ message: (error as Error).message })
       }
     },
   )

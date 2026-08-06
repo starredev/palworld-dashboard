@@ -133,6 +133,17 @@ export const inventoryResponseSchema = z.object({
 })
 export type InventoryResponse = z.infer<typeof inventoryResponseSchema>
 
+/** Give an item to a player's inventory. */
+export const giveItemInputSchema = z.object({
+  staticId: z
+    .string()
+    .min(1)
+    .max(120)
+    .regex(/^[A-Za-z0-9_]+$/),
+  count: z.number().int().min(1).max(9999),
+})
+export type GiveItemInput = z.infer<typeof giveItemInputSchema>
+
 /** A player as listed from the save itself (works for offline players too). */
 export const savePlayerSchema = z.object({
   uid: z.string(),
