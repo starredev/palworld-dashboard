@@ -22,27 +22,17 @@ const routes: RouteRecordRaw[] = [
       {
         path: 'players',
         name: 'players',
-        component: () => import('@/features/players/pages/PlayersPage.vue'),
+        component: () => import('@/features/players/pages/PlayersHubPage.vue'),
         meta: { title: 'Players' },
       },
-      {
-        path: 'guilds',
-        name: 'guilds',
-        component: () => import('@/features/guilds/pages/GuildsPage.vue'),
-        meta: { title: 'Guilds' },
-      },
+      { path: 'guilds', redirect: { path: '/players', query: { tab: 'guilds' } } },
       {
         path: 'pals',
         name: 'pals',
-        component: () => import('@/features/pals/pages/PalsPage.vue'),
+        component: () => import('@/features/pals/pages/PalsHubPage.vue'),
         meta: { title: 'Pals' },
       },
-      {
-        path: 'paldeck',
-        name: 'paldeck',
-        component: () => import('@/features/paldeck/pages/PaldeckPage.vue'),
-        meta: { title: 'Paldeck' },
-      },
+      { path: 'paldeck', redirect: { path: '/pals', query: { tab: 'paldeck' } } },
       {
         path: 'map',
         name: 'map',
@@ -58,9 +48,10 @@ const routes: RouteRecordRaw[] = [
       {
         path: 'logs',
         name: 'logs',
-        component: () => import('@/features/logs/pages/LogsPage.vue'),
+        component: () => import('@/features/logs/pages/LogsHubPage.vue'),
         meta: { title: 'Logs' },
       },
+      { path: 'activity', redirect: { path: '/logs', query: { tab: 'activity' } } },
       {
         path: 'config',
         name: 'config',
@@ -78,12 +69,6 @@ const routes: RouteRecordRaw[] = [
         name: 'backups',
         component: () => import('@/features/backups/pages/BackupsPage.vue'),
         meta: { title: 'Backups' },
-      },
-      {
-        path: 'activity',
-        name: 'activity',
-        component: () => import('@/features/activity/pages/ActivityPage.vue'),
-        meta: { title: 'Activity' },
       },
       {
         path: ':pathMatch(.*)*',
