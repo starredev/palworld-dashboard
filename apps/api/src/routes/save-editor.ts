@@ -2,8 +2,10 @@ import type { FastifyInstance } from 'fastify'
 import {
   teleportInputSchema,
   techPointsInputSchema,
+  type LevelSummary,
   type PlayerDetail,
   type PlayerLocation,
+  type PlayerStats,
   type SaveEditorStatus,
 } from '@tsuki/types'
 import { authenticate, requireAdmin } from '../plugins/auth'
@@ -12,6 +14,7 @@ import { isSaveEditorAvailable } from '../services/save-editor'
 import { isSaveEditAvailable } from '../services/save-edit'
 import { readPlayerLocation, teleportPlayer } from '../services/save-teleport'
 import { giveTechPoints, readPlayerDetail } from '../services/save-player-fields'
+import { isLevelAvailable, readLevelSummary, readPlayerStats } from '../services/save-level'
 
 interface UidParams {
   uid: string
@@ -56,6 +59,42 @@ export async function saveEditorRoutes(app: FastifyInstance): Promise<void> {
       }
       try {
         return { available: true, ...(await readPlayerDetail(req.params.uid)) }
+      } catch (error) {
+        reply.log.error(error)
+        return reply.status(400).send({ message: (error as Error).message })
+      }
+    },
+  )
+
+  // Read-only: a player's in-world stats + owned pals from Level.sav. Heavier
+  // (decodes the whole Level.sav) — the flashy inspector data.
+  app.get<{ Params: UidParams }>(
+    '/save/players/:uid/stats',
+    { preHandler: authenticate },
+    async (req, reply): Promise<PlayerStats> => {
+      if (!isLevelAvailable()) {
+        return reply.status(503).send({ message: 'Level.sav is not available' })
+      }
+      try {
+        return { available: true, ...(await readPlayerStats(req.params.uid)) }
+      } catch (error) {
+        reply.log.error(error)
+        return reply.status(400).send({ message: (error as Error).message })
+      }
+    },
+  )
+
+  // Read-only: decode Level.sav and count players/pals — validates the decode
+  // path (rawdata patches + perf) before we trust any Level.sav write.
+  app.get(
+    '/save/level/summary',
+    { preHandler: authenticate },
+    async (_req, reply): Promise<LevelSummary> => {
+      if (!isLevelAvailable()) {
+        return reply.status(503).send({ message: 'Level.sav is not available' })
+      }
+      try {
+        return { available: true, ...(await readLevelSummary()) }
       } catch (error) {
         reply.log.error(error)
         return reply.status(400).send({ message: (error as Error).message })

@@ -48,7 +48,9 @@ COPY --from=build /app ./
 # Save-file editor: Python 3 + palworld-save-tools v0.24.0, patched for the new
 # Oodle (PlM) save format. We overlay quadrantbs' hostfix palsav.py (reads PlM
 # via libooz, writes back as plain zlib — which the game still loads, so no Oodle
-# *compression* is ever needed) and copy in the libooz.so built above. Pinned refs.
+# *compression* is ever needed) PLUS its patched rawdata/*.py decoders (the 2026
+# update appended trailing bytes to Level.sav structs; the patches preserve them
+# so Level.sav round-trips), and copy in the libooz.so built above. Pinned refs.
 ARG SAVE_TOOLS_REF=v0.24.0
 ARG HOSTFIX_REF=306dd72f73b09c815b91b3744c1a297c3074dc3b
 RUN apk add --no-cache python3 libstdc++ libgcc
@@ -61,6 +63,8 @@ RUN mkdir -p /opt/palworld-save-tools /tmp/hostfix \
  && tar -xzf /tmp/hostfix.tar.gz -C /tmp/hostfix --strip-components=1 \
  && cp /tmp/hostfix/patched_palworld_save_tools/palsav.py \
        /opt/palworld-save-tools/palworld_save_tools/palsav.py \
+ && cp /tmp/hostfix/patched_palworld_save_tools/rawdata/*.py \
+       /opt/palworld-save-tools/palworld_save_tools/rawdata/ \
  && rm -rf /tmp/pst.tar.gz /tmp/hostfix.tar.gz /tmp/hostfix
 
 # Own the backups mount point as `node` so the named volume is seeded with

@@ -1,0 +1,153 @@
+import { existsSync } from 'node:fs'
+import { join } from 'node:path'
+import type { LevelSummary, PlayerStats } from '@tsuki/types'
+import { readSaveJson, isSaveEditorAvailable } from './save-editor'
+import { deepFind } from './save-location'
+import { findWorldSaveDir } from './save-teleport'
+
+// Player + pal records both live in Level.sav's CharacterSaveParameterMap, at
+// entry.value.RawData.value.object.SaveParameter.value. Values are wrapped as
+// { value, type } (sometimes doubly, e.g. ByteProperty/FixedPoint64).
+
+function levelSavPath(): string {
+  return join(findWorldSaveDir(), 'Level.sav')
+}
+
+/** Level.sav reads need the converter, the save dir, and Level.sav present. */
+export function isLevelAvailable(): boolean {
+  if (!isSaveEditorAvailable()) return false
+  try {
+    return existsSync(levelSavPath())
+  } catch {
+    return false
+  }
+}
+
+interface ValueNode {
+  value: unknown
+}
+function isVN(n: unknown): n is ValueNode {
+  return typeof n === 'object' && n !== null && 'value' in n
+}
+/** Walk a chain of plain object keys, tolerating any missing hop. */
+function dig(node: unknown, ...keys: string[]): unknown {
+  let cur = node
+  for (const k of keys) {
+    if (!cur || typeof cur !== 'object') return undefined
+    cur = (cur as Record<string, unknown>)[k]
+  }
+  return cur
+}
+
+const numVal = (n: unknown): number | null =>
+  isVN(n) && typeof n.value === 'number' ? n.value : null
+const strVal = (n: unknown): string | null =>
+  isVN(n) && typeof n.value === 'string' ? n.value : null
+// ByteProperty / EnumProperty nest twice: { value: { value: X } }
+const byteVal = (n: unknown): number | null => {
+  const v = dig(n, 'value', 'value')
+  return typeof v === 'number' ? v : null
+}
+const enumVal = (n: unknown): string | null => {
+  const v = dig(n, 'value', 'value')
+  return typeof v === 'string' ? v : null
+}
+// FixedPoint64 HP is stored ×1000: { value: { Value: { value: milliHp } } }
+function hpVal(params: Record<string, unknown>): number | null {
+  const milli = dig(params['Hp'] ?? params['HP'], 'value', 'Value', 'value')
+  return typeof milli === 'number' ? Math.round(milli / 1000) : null
+}
+
+function characterEntries(levelJson: unknown): unknown[] {
+  const map = deepFind(levelJson, 'CharacterSaveParameterMap')
+  const arr = isVN(map) ? map.value : undefined
+  return Array.isArray(arr) ? arr : []
+}
+function saveParam(entry: unknown): Record<string, unknown> | null {
+  const sp = deepFind(entry, 'SaveParameter')
+  return isVN(sp) && sp.value && typeof sp.value === 'object'
+    ? (sp.value as Record<string, unknown>)
+    : null
+}
+function isPlayerParams(params: Record<string, unknown>): boolean {
+  const p = params['IsPlayer']
+  return isVN(p) && p.value === true
+}
+
+function normUid(s: string): string {
+  return s.replace(/[^0-9a-fA-F]/g, '').toLowerCase()
+}
+/** Match a save GUID to a player uid — full hex, or the leading 8 (the id part). */
+function uidMatches(guid: unknown, uid: string): boolean {
+  if (typeof guid !== 'string') return false
+  const a = normUid(guid)
+  const b = normUid(uid)
+  if (!a || !b) return false
+  return a === b || (a.length >= 8 && b.length >= 8 && a.slice(0, 8) === b.slice(0, 8))
+}
+
+type Stats = Pick<PlayerStats, 'nickName' | 'level' | 'exp' | 'hp' | 'hunger' | 'sanity'>
+
+/** Pure: extract a player's stats + owned pals from parsed Level.sav JSON. */
+export function parsePlayerStats(levelJson: unknown, uid: string): Omit<PlayerStats, 'available'> {
+  const empty: Stats = {
+    nickName: null,
+    level: null,
+    exp: null,
+    hp: null,
+    hunger: null,
+    sanity: null,
+  }
+  let stats: Stats | null = null
+  const pals: PlayerStats['pals'] = []
+
+  for (const entry of characterEntries(levelJson)) {
+    const params = saveParam(entry)
+    if (!params) continue
+    if (isPlayerParams(params)) {
+      if (!stats && uidMatches(dig(entry, 'key', 'PlayerUId', 'value'), uid)) {
+        stats = {
+          nickName: strVal(params['NickName']),
+          level: byteVal(params['Level']) ?? 1,
+          exp: numVal(params['Exp']) ?? 0,
+          hp: hpVal(params),
+          hunger: numVal(params['FullStomach']),
+          sanity: numVal(params['SanityValue']),
+        }
+      }
+    } else if (uidMatches(dig(params['OwnerPlayerUId'], 'value'), uid)) {
+      pals.push({
+        species: strVal(params['CharacterID']) ?? 'Unknown',
+        nickname: strVal(params['NickName']),
+        level: byteVal(params['Level']) ?? 1,
+        gender: enumVal(params['Gender'])?.split('::').pop() ?? null,
+      })
+    }
+  }
+
+  pals.sort((a, b) => b.level - a.level)
+  return { found: stats !== null, ...(stats ?? empty), pals }
+}
+
+/** Pure: count player vs pal records in parsed Level.sav JSON. */
+export function parseLevelSummary(levelJson: unknown): Omit<LevelSummary, 'available'> {
+  let players = 0
+  let pals = 0
+  for (const entry of characterEntries(levelJson)) {
+    const params = saveParam(entry)
+    if (!params) continue
+    if (isPlayerParams(params)) players++
+    else pals++
+  }
+  return { players, pals }
+}
+
+/** Read a player's stats + pals from Level.sav (decodes the whole file). */
+export async function readPlayerStats(uid: string): Promise<Omit<PlayerStats, 'available'>> {
+  return parsePlayerStats(await readSaveJson(levelSavPath()), uid)
+}
+
+/** Decode Level.sav and count players/pals — cheap validation of the decode path. */
+export async function readLevelSummary(): Promise<Omit<LevelSummary, 'available'>> {
+  return parseLevelSummary(await readSaveJson(levelSavPath()))
+}

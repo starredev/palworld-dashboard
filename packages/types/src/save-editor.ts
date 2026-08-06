@@ -44,6 +44,41 @@ export const playerDetailSchema = z.object({
 })
 export type PlayerDetail = z.infer<typeof playerDetailSchema>
 
+/** A pal owned by a player, summarised from Level.sav. */
+export const palSummarySchema = z.object({
+  species: z.string(),
+  nickname: z.string().nullable(),
+  level: z.number(),
+  gender: z.string().nullable(),
+})
+export type PalSummary = z.infer<typeof palSummarySchema>
+
+/**
+ * A player's in-world stats + owned pals, from Level.sav's
+ * CharacterSaveParameterMap. `found` is false when no matching player record
+ * exists (e.g. brand-new player). Reading this decodes the whole Level.sav.
+ */
+export const playerStatsSchema = z.object({
+  available: z.boolean(),
+  found: z.boolean(),
+  nickName: z.string().nullable(),
+  level: z.number().nullable(),
+  exp: z.number().nullable(),
+  hp: z.number().nullable(),
+  hunger: z.number().nullable(),
+  sanity: z.number().nullable(),
+  pals: z.array(palSummarySchema),
+})
+export type PlayerStats = z.infer<typeof playerStatsSchema>
+
+/** Count of player vs pal records in Level.sav — a cheap decode health check. */
+export const levelSummarySchema = z.object({
+  available: z.boolean(),
+  players: z.number(),
+  pals: z.number(),
+})
+export type LevelSummary = z.infer<typeof levelSummarySchema>
+
 /** Set a player's technology points (at least one field required). */
 export const techPointsInputSchema = z
   .object({
