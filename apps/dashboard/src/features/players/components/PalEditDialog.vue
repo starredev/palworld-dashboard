@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { X, HeartPulse, Copy, Layers } from 'lucide-vue-next'
+import { X, HeartPulse, Copy, Layers, Plus } from 'lucide-vue-next'
 import { Button, Input } from '@tsuki/ui'
 import type { PalSummary } from '@tsuki/types'
 import { useQueueOp } from '@/composables/use-save-batch'
+import { PASSIVES, passiveName, passiveDef, KIND_COLOR } from '../passives'
 
 const props = defineProps<{ pal: PalSummary | null; uid: string | null }>()
 const emit = defineEmits<{ close: []; done: [] }>()
@@ -11,6 +12,9 @@ const emit = defineEmits<{ close: []; done: [] }>()
 const done = () => (emit('done'), emit('close'))
 
 const form = ref({ level: '', hp: '', shot: '', defense: '', heal: false })
+// Selected passive ids (prefilled from the pal; unknown ids are preserved).
+const passives = ref<string[]>([])
+const addPick = ref('')
 
 watch(
   () => props.pal,
@@ -22,9 +26,27 @@ watch(
       defense: p?.talentDefense != null ? String(p.talentDefense) : '0',
       heal: false,
     }
+    passives.value = [...(p?.passives ?? [])]
+    addPick.value = ''
   },
   { immediate: true },
 )
+
+// Dataset options not already on the pal (dedupe against current selection).
+const addable = computed(() => PASSIVES.filter((d) => !passives.value.includes(d.id)))
+function addPassive(id: string): void {
+  if (id && passives.value.length < 4 && !passives.value.includes(id)) passives.value.push(id)
+  addPick.value = ''
+}
+function removePassive(id: string): void {
+  passives.value = passives.value.filter((p) => p !== id)
+}
+const passivesChanged = computed(() => {
+  const a = [...(props.pal?.passives ?? [])].sort()
+  const b = [...passives.value].sort()
+  return a.length !== b.length || a.some((x, i) => x !== b[i])
+})
+const kindColor = (id: string) => KIND_COLOR[passiveDef(id)?.kind ?? 'utility']
 
 const title = computed(
   () => props.pal?.nickname || props.pal?.species.replace('BOSS_', '') || 'Pal',
@@ -50,6 +72,7 @@ function queueEdit(): void {
         talentShot: num(form.value.shot),
         talentDefense: num(form.value.defense),
         ...(form.value.heal ? { heal: true } : {}),
+        ...(passivesChanged.value ? { passives: passives.value } : {}),
       },
     },
     { onSuccess: done },
@@ -105,6 +128,44 @@ function queueClone(): void {
               <span class="mb-1 block text-[10px] uppercase text-muted-foreground">{{ f.l }}</span>
               <Input v-model="form[f.k as 'hp' | 'shot' | 'defense']" type="number" />
             </label>
+          </div>
+
+          <!-- Passive skills (speed passives also boost mount/fly speed) -->
+          <div class="mt-4">
+            <p class="text-xs font-medium text-muted-foreground">
+              Passives · {{ passives.length }}/4
+            </p>
+            <div v-if="passives.length" class="mt-1.5 flex flex-wrap gap-1.5">
+              <span
+                v-for="id in passives"
+                :key="id"
+                class="inline-flex items-center gap-1.5 rounded-md bg-muted/60 py-1 pl-2 pr-1 text-xs"
+              >
+                <span class="size-1.5 rounded-full" :style="{ backgroundColor: kindColor(id) }" />
+                <span :title="passiveDef(id)?.effect ?? id">{{ passiveName(id) }}</span>
+                <button
+                  class="text-muted-foreground hover:text-foreground"
+                  aria-label="Remove"
+                  @click="removePassive(id)"
+                >
+                  <X class="size-3" />
+                </button>
+              </span>
+            </div>
+            <div v-if="passives.length < 4" class="mt-1.5 flex items-center gap-1.5">
+              <select
+                v-model="addPick"
+                class="h-8 min-w-0 flex-1 rounded-lg border border-border bg-background px-2 text-xs outline-none focus:ring-2 focus:ring-ring"
+              >
+                <option value="">Add a passive…</option>
+                <option v-for="d in addable" :key="d.id" :value="d.id">
+                  {{ d.name }} — {{ d.effect }}
+                </option>
+              </select>
+              <Button variant="outline" size="sm" :disabled="!addPick" @click="addPassive(addPick)">
+                <Plus />
+              </Button>
+            </div>
           </div>
 
           <label class="mt-4 flex cursor-pointer items-center gap-2 text-sm">

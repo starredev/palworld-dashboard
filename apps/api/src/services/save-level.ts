@@ -173,6 +173,7 @@ export function parsePlayerStats(levelJson: unknown, uid: string): Omit<PlayerSt
         talentShot: byteVal(params['Talent_Shot']),
         talentDefense: byteVal(params['Talent_Defense']),
         lucky: isVN(rare) && rare.value === true,
+        passives: readPassives(params),
       })
     }
   }
@@ -425,6 +426,33 @@ function healPal(params: Record<string, unknown>): void {
 }
 
 /** Apply an edit to a pal's SaveParameter in place. */
+/** Read a pal's passive skill ids (empty when absent). */
+function readPassives(params: Record<string, unknown>): string[] {
+  const vals = dig(params['PassiveSkillList'], 'value', 'values')
+  return Array.isArray(vals) ? vals.filter((v): v is string => typeof v === 'string') : []
+}
+
+/**
+ * Overwrite a pal's passive skills. Dedupes and clamps to 4 (the in-game max).
+ * A freshly-caught pal can have no PassiveSkillList node at all, so create the
+ * full ArrayProperty (NameProperty) node when it's missing.
+ */
+export function setPassives(params: Record<string, unknown>, passives: string[]): void {
+  const list = [...new Set(passives.filter((p) => typeof p === 'string' && p.length))].slice(0, 4)
+  const existing = params['PassiveSkillList']
+  const valuesNode = dig(existing, 'value')
+  if (isVN(existing) && valuesNode && typeof valuesNode === 'object') {
+    ;(valuesNode as Record<string, unknown>)['values'] = list
+  } else {
+    params['PassiveSkillList'] = {
+      array_type: 'NameProperty',
+      id: null,
+      value: { values: list },
+      type: 'ArrayProperty',
+    }
+  }
+}
+
 export function applyPalEdit(params: Record<string, unknown>, input: PalEditInput): void {
   if (input.level !== undefined)
     ensureByte(params, 'Level', input.level, ['Rank', 'Talent_HP', 'Talent_Shot', 'Talent_Defense'])
@@ -434,6 +462,7 @@ export function applyPalEdit(params: Record<string, unknown>, input: PalEditInpu
     ensureByte(params, 'Talent_Shot', input.talentShot, ['Talent_HP', 'Talent_Defense'])
   if (input.talentDefense !== undefined)
     ensureByte(params, 'Talent_Defense', input.talentDefense, ['Talent_HP', 'Talent_Shot'])
+  if (input.passives !== undefined) setPassives(params, input.passives)
   if (input.heal) healPal(params)
 }
 

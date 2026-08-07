@@ -184,6 +184,36 @@ describe('applyPalEdit', () => {
     expect((params.Talent_Defense as { value: { value: number } }).value.value).toBe(80)
   })
 
+  it('creates a PassiveSkillList node when the pal has none, deduped + capped at 4', () => {
+    const params: Record<string, unknown> = { Level: byteNode(10) }
+    applyPalEdit(params, {
+      passives: ['MoveSpeed_up_3', 'MoveSpeed_up_3', 'Rare', 'Brave', 'Deffence_up1', 'Extra'],
+    })
+    const node = params.PassiveSkillList as {
+      array_type: string
+      type: string
+      value: { values: string[] }
+    }
+    expect(node.type).toBe('ArrayProperty')
+    expect(node.array_type).toBe('NameProperty')
+    expect(node.value.values).toEqual(['MoveSpeed_up_3', 'Rare', 'Brave', 'Deffence_up1'])
+  })
+
+  it('overwrites an existing PassiveSkillList in place', () => {
+    const params: Record<string, unknown> = {
+      PassiveSkillList: {
+        array_type: 'NameProperty',
+        id: null,
+        value: { values: ['Old'] },
+        type: 'ArrayProperty',
+      },
+    }
+    applyPalEdit(params, { passives: ['MoveSpeed_up_2'] })
+    expect((params.PassiveSkillList as { value: { values: string[] } }).value.values).toEqual([
+      'MoveSpeed_up_2',
+    ])
+  })
+
   it('heals: clears sickness/revive and tops sanity', () => {
     const params: Record<string, unknown> = {
       SanityValue: { value: 20, type: 'FloatProperty' },

@@ -56,6 +56,8 @@ export const palSummarySchema = z.object({
   talentShot: z.number().nullable(),
   talentDefense: z.number().nullable(),
   lucky: z.boolean(),
+  /** Passive skill internal ids (e.g. "MoveSpeed_up_3"). */
+  passives: z.array(z.string()),
 })
 export type PalSummary = z.infer<typeof palSummarySchema>
 
@@ -67,6 +69,8 @@ export const palEditInputSchema = z
     talentShot: z.number().int().min(0).max(100).optional(),
     talentDefense: z.number().int().min(0).max(100).optional(),
     heal: z.boolean().optional(),
+    /** Replace the pal's passive skills (internal ids). Max 4, deduped. */
+    passives: z.array(z.string().min(1)).max(4).optional(),
   })
   .refine((v) => Object.values(v).some((x) => x !== undefined), {
     message: 'Nothing to change',
