@@ -1,18 +1,18 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
-import { Loader2, Database, Utensils, ArrowUpNarrowWide, Gauge } from 'lucide-vue-next'
+import { computed, onMounted, ref, watch } from 'vue'
+import { Loader2, Database, Utensils, ArrowUpNarrowWide, Gauge, Sparkles } from 'lucide-vue-next'
 import { Button, Input } from '@tsuki/ui'
 import type { PalPlayer, PalSummary, PlayerStats } from '@tsuki/types'
 import { api } from '@/lib/api'
 import { useQueueOp } from '@/composables/use-save-batch'
+import { usePalIcons } from '../use-pal-icons'
 import PalEditDialog from './PalEditDialog.vue'
 import PlayerInventory from './PlayerInventory.vue'
 import PlayerStatsDialog from './PlayerStatsDialog.vue'
 
+const props = defineProps<{ player: PalPlayer | null; canEdit?: boolean; auto?: boolean }>()
+
 const editingStats = ref(false)
-
-const props = defineProps<{ player: PalPlayer | null; canEdit?: boolean }>()
-
 const editingPal = ref<PalSummary | null>(null)
 function openPal(pal: PalSummary): void {
   if (props.canEdit && pal.instanceId) editingPal.value = pal
@@ -22,6 +22,22 @@ const stats = ref<PlayerStats | null>(null)
 const loading = ref(false)
 const error = ref('')
 const levelInput = ref('')
+
+const pal = usePalIcons()
+const ELEMENT_COLORS: Record<string, string> = {
+  Normal: '#a1a1aa',
+  Fire: '#f97316',
+  Water: '#38bdf8',
+  Leaf: '#4ade80',
+  Electric: '#facc15',
+  Electricity: '#facc15',
+  Ice: '#67e8f9',
+  Ground: '#c9a227',
+  Dark: '#a78bfa',
+  Dragon: '#818cf8',
+}
+const elemColor = (species: string): string =>
+  ELEMENT_COLORS[pal.info(species)?.element ?? 'Normal'] ?? '#71717a'
 
 // Reading Level.sav is heavy (decodes the whole file), so load on demand.
 async function load(): Promise<void> {
@@ -47,8 +63,12 @@ watch(
     stats.value = null
     error.value = ''
     levelInput.value = ''
+    if (props.auto && props.player?.playerId) void load()
   },
 )
+onMounted(() => {
+  if (props.auto && props.player?.playerId) void load()
+})
 
 // Quick actions queue into the shared batch (applied together, one restart).
 const queue = useQueueOp()
@@ -97,58 +117,107 @@ const rows = computed(() => {
         No save record for this player yet.
       </p>
       <template v-else>
-        <dl class="mt-4 grid grid-cols-4 gap-2 text-center">
-          <div v-for="r in rows" :key="r.label" class="rounded-lg bg-muted/40 py-2">
-            <dt class="text-[10px] uppercase tracking-wide text-muted-foreground">{{ r.label }}</dt>
-            <dd class="text-sm font-semibold tabular-nums">{{ r.value }}</dd>
-          </div>
-        </dl>
+        <div class="mt-4 grid gap-5 lg:grid-cols-3">
+          <!-- Stats + quick actions -->
+          <div class="space-y-4 lg:col-span-1">
+            <dl class="grid grid-cols-2 gap-2 text-center">
+              <div v-for="r in rows" :key="r.label" class="rounded-lg bg-muted/40 py-2.5">
+                <dt class="text-[10px] uppercase tracking-wide text-muted-foreground">
+                  {{ r.label }}
+                </dt>
+                <dd class="text-sm font-semibold tabular-nums">{{ r.value }}</dd>
+              </div>
+            </dl>
 
-        <!-- Pals -->
-        <div class="mt-4">
-          <p class="mb-1.5 text-xs text-muted-foreground">
-            Pals · {{ stats.pals.length }}
-            <span v-if="canEdit" class="text-muted-foreground/60">· click to edit</span>
-          </p>
-          <div class="max-h-40 space-y-1 overflow-y-auto pr-1">
-            <div
-              v-for="(pal, i) in stats.pals"
-              :key="i"
-              class="flex items-center justify-between rounded-md bg-muted/30 px-2.5 py-1.5 text-xs"
-              :class="canEdit && pal.instanceId ? 'cursor-pointer hover:bg-muted/60' : ''"
-              @click="openPal(pal)"
-            >
-              <span class="truncate">
-                <span v-if="pal.species.startsWith('BOSS_')" class="mr-1 text-amber-400">★</span>
-                {{ pal.nickname ?? pal.species.replace('BOSS_', '') }}
-              </span>
-              <span class="shrink-0 text-muted-foreground">Lv {{ pal.level }}</span>
+            <div v-if="canEdit" class="space-y-2">
+              <div class="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  class="flex-1"
+                  :disabled="queue.isPending.value"
+                  @click="askRefuel"
+                >
+                  <Utensils /> Refuel
+                </Button>
+                <Button variant="outline" size="sm" class="flex-1" @click="editingStats = true">
+                  <Gauge /> Edit stats
+                </Button>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <Input v-model="levelInput" type="number" class="w-full" placeholder="Level" />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  :disabled="queue.isPending.value"
+                  @click="askSetLevel"
+                >
+                  <ArrowUpNarrowWide /> Set
+                </Button>
+              </div>
             </div>
+          </div>
+
+          <!-- Pals grid -->
+          <div class="lg:col-span-2">
+            <p class="mb-2 text-xs text-muted-foreground">
+              Pals · {{ stats.pals.length }}
+              <span v-if="canEdit" class="text-muted-foreground/60">· click to edit</span>
+            </p>
+            <div
+              v-if="stats.pals.length"
+              class="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4"
+            >
+              <button
+                v-for="(p, i) in stats.pals"
+                :key="i"
+                type="button"
+                class="flex items-center gap-2.5 rounded-xl border border-border bg-muted/20 p-2 text-left transition-colors"
+                :class="
+                  canEdit && p.instanceId
+                    ? 'cursor-pointer hover:border-primary/40 hover:bg-muted/50'
+                    : 'cursor-default'
+                "
+                @click="openPal(p)"
+              >
+                <span
+                  class="grid size-10 shrink-0 place-items-center overflow-hidden rounded-lg"
+                  :style="{ backgroundColor: elemColor(p.species) + '22' }"
+                >
+                  <img
+                    v-if="pal.iconUrl(p.species)"
+                    :src="pal.iconUrl(p.species)!"
+                    :alt="pal.displayName(p.species, p.nickname)"
+                    loading="lazy"
+                    class="size-9 object-contain"
+                    @error="pal.onIconError(p.species)"
+                  />
+                  <span
+                    v-else
+                    class="size-3 rounded-full"
+                    :style="{ backgroundColor: elemColor(p.species) }"
+                  />
+                </span>
+                <span class="min-w-0 flex-1">
+                  <span class="flex items-center gap-1 truncate text-xs font-medium">
+                    <span v-if="pal.isBoss(p.species)" class="text-amber-400">★</span>
+                    <Sparkles v-if="p.lucky" class="size-3 shrink-0 text-yellow-300" />
+                    <span class="truncate">{{ pal.displayName(p.species, p.nickname) }}</span>
+                  </span>
+                  <span class="mt-0.5 block text-[11px] text-muted-foreground">
+                    Lv {{ p.level }}
+                    <span v-if="p.nickname" class="text-muted-foreground/60">
+                      · {{ pal.info(p.species)?.name ?? pal.baseId(p.species) }}
+                    </span>
+                  </span>
+                </span>
+              </button>
+            </div>
+            <p v-else class="text-xs text-muted-foreground">No pals in this player's boxes.</p>
           </div>
         </div>
 
         <PlayerInventory :uid="player?.playerId ?? null" :can-edit="canEdit" />
-
-        <!-- Quick actions (admin) -->
-        <div v-if="canEdit" class="mt-5 flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" :disabled="queue.isPending.value" @click="askRefuel">
-            <Utensils /> Refuel
-          </Button>
-          <Button variant="outline" size="sm" @click="editingStats = true">
-            <Gauge /> Edit stats
-          </Button>
-          <div class="flex items-center gap-1.5">
-            <Input v-model="levelInput" type="number" class="w-20" placeholder="Lvl" />
-            <Button
-              variant="outline"
-              size="sm"
-              :disabled="queue.isPending.value"
-              @click="askSetLevel"
-            >
-              <ArrowUpNarrowWide /> Set level
-            </Button>
-          </div>
-        </div>
       </template>
     </template>
 
