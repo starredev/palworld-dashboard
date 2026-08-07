@@ -25,7 +25,19 @@ const routes: RouteRecordRaw[] = [
         component: () => import('@/features/players/pages/PlayersHubPage.vue'),
         meta: { title: 'Players' },
       },
+      {
+        path: 'players/:uid',
+        name: 'player',
+        component: () => import('@/features/players/pages/PlayerDetailPage.vue'),
+        meta: { title: 'Player' },
+      },
       { path: 'guilds', redirect: { path: '/players', query: { tab: 'guilds' } } },
+      {
+        path: 'guilds/:id',
+        name: 'guild',
+        component: () => import('@/features/guilds/pages/GuildDetailPage.vue'),
+        meta: { title: 'Guild' },
+      },
       {
         path: 'pals',
         name: 'pals',

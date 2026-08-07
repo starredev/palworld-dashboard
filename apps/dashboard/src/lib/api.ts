@@ -23,6 +23,7 @@ import {
   playerStatsSchema,
   savePlayersResponseSchema,
   paldeckResponseSchema,
+  saveGuildsResponseSchema,
   inventoryResponseSchema,
   saveBatchSchema,
   batchApplyResultSchema,
@@ -65,6 +66,7 @@ import {
   type PlayerStats,
   type SavePlayersResponse,
   type PaldeckResponse,
+  type SaveGuildsResponse,
   type PalEditInput,
   type PlayerStatsInput,
   type InventoryResponse,
@@ -309,6 +311,10 @@ export const api = {
 
   getPaldeck(): Promise<PaldeckResponse> {
     return apiFetch('/save/paldeck', { schema: paldeckResponseSchema })
+  },
+
+  getSaveGuilds(): Promise<SaveGuildsResponse> {
+    return apiFetch('/save/guilds', { schema: saveGuildsResponseSchema })
   },
 
   getPlayerStats(uid: string): Promise<PlayerStats> {

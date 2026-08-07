@@ -279,6 +279,20 @@ export function findPlayerParamsRef(
   return null
 }
 
+/** The character InstanceId(s) (normalised hex) of a player's own avatar entries. */
+export function playerInstanceIds(levelJson: unknown, uid: string): string[] {
+  const ids: string[] = []
+  for (const entry of characterEntries(levelJson)) {
+    const params = saveParam(entry)
+    if (!params || !isPlayerParams(params)) continue
+    if (uidMatches(dig(entry, 'key', 'PlayerUId', 'value'), uid)) {
+      const id = dig(entry, 'key', 'InstanceId', 'value')
+      if (typeof id === 'string') ids.push(normUid(id))
+    }
+  }
+  return ids
+}
+
 /** Restore hunger + sanity to full. Fields are set only if present in the save. */
 export function refuelPlayer(params: Record<string, unknown>): void {
   const fs = params['FullStomach']

@@ -172,6 +172,33 @@ export const paldeckResponseSchema = z.object({
 })
 export type PaldeckResponse = z.infer<typeof paldeckResponseSchema>
 
+/** A guild read straight from Level.sav's GroupSaveDataMap (editable source). */
+export const saveGuildMemberSchema = z.object({
+  uid: z.string(),
+  name: z.string().nullable(),
+  /** ISO timestamp of last online, when the save records it. */
+  lastOnline: z.string().nullable(),
+  isAdmin: z.boolean(),
+})
+export type SaveGuildMember = z.infer<typeof saveGuildMemberSchema>
+
+export const saveGuildSchema = z.object({
+  /** group_id (32-hex) — the handle used to target edits. */
+  id: z.string(),
+  name: z.string(),
+  adminUid: z.string().nullable(),
+  baseCount: z.number().int().nonnegative(),
+  palCount: z.number().int().nonnegative(),
+  members: z.array(saveGuildMemberSchema),
+})
+export type SaveGuild = z.infer<typeof saveGuildSchema>
+
+export const saveGuildsResponseSchema = z.object({
+  available: z.boolean(),
+  guilds: z.array(saveGuildSchema),
+})
+export type SaveGuildsResponse = z.infer<typeof saveGuildsResponseSchema>
+
 /** Count of player vs pal records in Level.sav — a cheap decode health check. */
 export const levelSummarySchema = z.object({
   available: z.boolean(),
@@ -244,6 +271,25 @@ const giveOp = {
   label: z.string(),
   item: giveItemInputSchema,
 }
+// Guild ops target a guild (group_id) rather than a player uid.
+const guildRenameOp = {
+  type: z.literal('guildRename'),
+  guildId: z.string(),
+  label: z.string(),
+  name: z.string().min(1).max(64),
+}
+const guildLeaderOp = {
+  type: z.literal('guildLeader'),
+  guildId: z.string(),
+  label: z.string(),
+  memberUid: z.string(),
+}
+const guildKickOp = {
+  type: z.literal('guildKick'),
+  guildId: z.string(),
+  label: z.string(),
+  memberUid: z.string(),
+}
 
 export const saveOpInputSchema = z.discriminatedUnion('type', [
   z.object(teleportOp),
@@ -254,6 +300,9 @@ export const saveOpInputSchema = z.discriminatedUnion('type', [
   z.object(palEditOp),
   z.object(palCloneOp),
   z.object(giveOp),
+  z.object(guildRenameOp),
+  z.object(guildLeaderOp),
+  z.object(guildKickOp),
 ])
 export type SaveOpInput = z.infer<typeof saveOpInputSchema>
 
@@ -266,6 +315,9 @@ export const saveOpSchema = z.discriminatedUnion('type', [
   z.object({ ...palEditOp, id: z.string() }),
   z.object({ ...palCloneOp, id: z.string() }),
   z.object({ ...giveOp, id: z.string() }),
+  z.object({ ...guildRenameOp, id: z.string() }),
+  z.object({ ...guildLeaderOp, id: z.string() }),
+  z.object({ ...guildKickOp, id: z.string() }),
 ])
 export type SaveOp = z.infer<typeof saveOpSchema>
 

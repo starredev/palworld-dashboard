@@ -26,6 +26,7 @@ import {
   setPlayerStats,
 } from './save-level'
 import { addItemToContainer, commonContainerGuid, isInventoryAvailable } from './save-inventory'
+import { kickGuildMemberMutate, renameGuildMutate, setGuildLeaderMutate } from './save-guild'
 
 const run = promisify(execFile)
 const stateSchema = z.object({ ops: z.array(saveOpSchema).default([]) })
@@ -79,6 +80,9 @@ function applyLevelOp(json: unknown, op: SaveOp, guids: Record<string, string>):
     if (!p) throw new Error('Pal not found')
     return applyPalEdit(p, op.input)
   }
+  if (op.type === 'guildRename') return renameGuildMutate(json, op.guildId, op.name)
+  if (op.type === 'guildLeader') return setGuildLeaderMutate(json, op.guildId, op.memberUid)
+  if (op.type === 'guildKick') return kickGuildMemberMutate(json, op.guildId, op.memberUid)
   const params = findPlayerParamsRef(json, op.uid)
   if (!params) throw new Error('Player not found in Level.sav')
   if (op.type === 'playerLevel') setPlayerLevel(params, op.level)
@@ -101,7 +105,9 @@ export async function applyBatch(app: FastifyInstance): Promise<BatchApplyResult
 
   const failed: { label: string; error: string }[] = []
   let applied = 0
-  const playerOps = ops.filter((o) => PLAYER_FILE_OPS.has(o.type))
+  // teleport / tech points carry a `uid` (per-player file); guild ops don't.
+  type PlayerFileOp = Extract<SaveOp, { type: 'teleport' | 'techPoints' }>
+  const playerOps = ops.filter((o): o is PlayerFileOp => PLAYER_FILE_OPS.has(o.type))
   const levelOps = ops.filter((o) => !PLAYER_FILE_OPS.has(o.type))
 
   app.log.info(`batch: applying ${ops.length} save edit(s)`)
@@ -110,7 +116,7 @@ export async function applyBatch(app: FastifyInstance): Promise<BatchApplyResult
     createBackup('pre-edit')
 
     // --- Per-player file edits (teleport / tech points) ---
-    const byUid = new Map<string, SaveOp[]>()
+    const byUid = new Map<string, PlayerFileOp[]>()
     for (const o of playerOps) {
       if (!byUid.has(o.uid)) byUid.set(o.uid, [])
       byUid.get(o.uid)!.push(o)
