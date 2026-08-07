@@ -101,7 +101,11 @@ describe('setGuildLeaderMutate', () => {
   })
   it('rejects a non-member', () => {
     expect(() =>
-      setGuildLeaderMutate(level(), 'AAAAAAAA000000000000000000000000', '99999999-0000-0000-0000-000000000000'),
+      setGuildLeaderMutate(
+        level(),
+        'AAAAAAAA000000000000000000000000',
+        '99999999-0000-0000-0000-000000000000',
+      ),
     ).toThrow(/not a member/)
   })
 })
@@ -111,11 +115,13 @@ describe('kickGuildMemberMutate', () => {
     const json = level()
     kickGuildMemberMutate(json, 'AAAAAAAA000000000000000000000000', BOB)
     const raw = rawData(json)
-    expect(raw.players.map((p: { player_info: { player_name: string } }) => p.player_info.player_name)).toEqual([
-      'Alice',
-    ])
+    expect(
+      raw.players.map((p: { player_info: { player_name: string } }) => p.player_info.player_name),
+    ).toEqual(['Alice'])
     // Bob's own handle is gone; Alice's and the pal handle remain.
-    const ids = raw.individual_character_handle_ids.map((h: { instance_id: string }) => h.instance_id)
+    const ids = raw.individual_character_handle_ids.map(
+      (h: { instance_id: string }) => h.instance_id,
+    )
     expect(ids).not.toContain(BOB_INSTANCE)
     expect(ids).toContain('PAL0-inst')
     expect(ids).toHaveLength(2)
