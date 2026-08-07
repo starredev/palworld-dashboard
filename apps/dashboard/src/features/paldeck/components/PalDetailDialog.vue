@@ -33,6 +33,23 @@ const ELEMENT_COLORS: Record<string, string> = {
 }
 const elemColor = (e?: string) => (e && ELEMENT_COLORS[e]) || '#71717a'
 const icon = (id: string) => `https://palworld.gg/images/full_palicon/T_${id}_icon_normal.png`
+
+const WORK_ICONS: Record<string, string> = {
+  Handiwork: '🔨',
+  Gathering: '🧺',
+  Lumbering: '🪓',
+  Mining: '⛏️',
+  Kindling: '🔥',
+  Watering: '💧',
+  Planting: '🌱',
+  'Generating Electricity': '⚡',
+  Cooling: '❄️',
+  'Medicine Production': '💊',
+  Transporting: '📦',
+  Farming: '🌾',
+}
+// Work level tint: 1 grey → 4 purple.
+const LV_COLORS = ['#71717a', '#a1a1aa', '#38bdf8', '#f59e0b', '#a78bfa']
 </script>
 
 <template>
@@ -106,16 +123,23 @@ const icon = (id: string) => `https://palworld.gg/images/full_palicon/T_${id}_ic
             </div>
           </dl>
 
-          <!-- Work suitability -->
+          <!-- Work suitability (crafting = Handiwork) -->
           <div v-if="pal.work.length" class="mt-4">
             <p class="mb-1.5 text-xs text-muted-foreground">Work suitability</p>
             <div class="flex flex-wrap gap-1.5">
               <span
                 v-for="w in pal.work"
                 :key="w.k"
-                class="rounded-md bg-muted/50 px-2 py-1 text-xs"
+                class="inline-flex items-center gap-1.5 rounded-md bg-muted/50 px-2 py-1 text-xs"
               >
-                {{ w.k }} <span class="text-muted-foreground">Lv{{ w.lv }}</span>
+                <span>{{ WORK_ICONS[w.k] ?? '•' }}</span>
+                {{ w.k }}
+                <span
+                  class="grid size-4 place-items-center rounded-full text-[10px] font-bold text-black"
+                  :style="{ backgroundColor: LV_COLORS[w.lv] ?? '#71717a' }"
+                >
+                  {{ w.lv }}
+                </span>
               </span>
             </div>
           </div>

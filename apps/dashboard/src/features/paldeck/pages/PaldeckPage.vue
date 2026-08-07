@@ -22,6 +22,37 @@ const paldeck = useQuery({
 })
 const owners = computed(() => paldeck.data.value?.owners ?? [])
 
+// Work suitabilities (crafting = Handiwork). Ordered with the crafting-relevant
+// skills first; the emoji stands in for the in-game work icon.
+const SKILLS = [
+  { k: 'Handiwork', icon: '🔨' },
+  { k: 'Gathering', icon: '🧺' },
+  { k: 'Lumbering', icon: '🪓' },
+  { k: 'Mining', icon: '⛏️' },
+  { k: 'Kindling', icon: '🔥' },
+  { k: 'Watering', icon: '💧' },
+  { k: 'Planting', icon: '🌱' },
+  { k: 'Generating Electricity', icon: '⚡' },
+  { k: 'Cooling', icon: '❄️' },
+  { k: 'Medicine Production', icon: '💊' },
+  { k: 'Transporting', icon: '📦' },
+  { k: 'Farming', icon: '🌾' },
+]
+const workLevel = (pal: PalEntry, k: string): number => pal.work.find((w) => w.k === k)?.lv ?? 0
+// Level tint: 1 grey → 4 purple (higher is better at the job).
+const LV_COLORS = ['#71717a', '#a1a1aa', '#38bdf8', '#f59e0b', '#a78bfa']
+const lvColor = (lv: number): string => LV_COLORS[lv] ?? '#71717a'
+
+const workFilter = ref('all') // 'all' | a skill key
+// When a skill is picked: only pals that have it, best level first.
+const displayed = computed<PalEntry[]>(() => {
+  if (workFilter.value === 'all') return pals
+  const k = workFilter.value
+  return pals
+    .filter((p) => workLevel(p, k) > 0)
+    .sort((a, b) => workLevel(b, k) - workLevel(a, k) || a.dex - b.dex)
+})
+
 const filter = ref('all') // 'all' (server-wide) | a player uid
 const ownedDex = computed<Set<number>>(() => {
   const set = new Set<number>()
@@ -75,20 +106,37 @@ const elemColor = (e?: string) => (e && ELEMENT_COLORS[e]) || '#71717a'
       <div class="space-y-1">
         <h2 class="text-xl font-semibold tracking-tight">Paldeck</h2>
         <p class="text-sm text-muted-foreground">
-          {{ ownedCount }} / {{ pals.length }} captured
-          {{ filter === 'all' ? 'on the server' : '' }}
+          <template v-if="workFilter === 'all'">
+            {{ ownedCount }} / {{ pals.length }} captured
+            {{ filter === 'all' ? 'on the server' : '' }}
+          </template>
+          <template v-else>
+            {{ displayed.length }} pals do {{ workFilter }} — best level first
+          </template>
         </p>
       </div>
-      <select
-        v-if="available && owners.length"
-        v-model="filter"
-        class="h-9 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
-      >
-        <option value="all">Everyone (server)</option>
-        <option v-for="o in owners" :key="o.uid" :value="o.uid">
-          {{ o.name ?? o.uid.slice(0, 8) }} · {{ o.species.length }}
-        </option>
-      </select>
+      <div class="flex flex-wrap gap-2">
+        <select
+          v-model="workFilter"
+          class="h-9 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+          title="Rank pals by a work skill"
+        >
+          <option value="all">All work skills</option>
+          <option v-for="s in SKILLS" :key="s.k" :value="s.k">
+            {{ s.icon }} {{ s.k }}{{ s.k === 'Handiwork' ? ' (crafting)' : '' }}
+          </option>
+        </select>
+        <select
+          v-if="available && owners.length"
+          v-model="filter"
+          class="h-9 rounded-lg border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-ring"
+        >
+          <option value="all">Everyone (server)</option>
+          <option v-for="o in owners" :key="o.uid" :value="o.uid">
+            {{ o.name ?? o.uid.slice(0, 8) }} · {{ o.species.length }}
+          </option>
+        </select>
+      </div>
     </header>
 
     <PagePlaceholder
@@ -115,13 +163,21 @@ const elemColor = (e?: string) => (e && ELEMENT_COLORS[e]) || '#71717a'
       class="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8"
     >
       <div
-        v-for="pal in pals"
+        v-for="pal in displayed"
         :key="pal.dex"
         class="cursor-pointer rounded-xl border border-border bg-card p-2.5 text-center transition hover:border-primary/40 hover:bg-accent/30"
         :class="ownedDex.has(pal.dex) ? '' : 'opacity-40 grayscale'"
         @click="selected = pal"
       >
         <div class="relative mx-auto grid size-14 place-items-center">
+          <span
+            v-if="workFilter !== 'all'"
+            class="absolute -left-1 -top-1 z-10 grid min-w-5 place-items-center rounded-full px-1 text-[10px] font-bold text-black"
+            :style="{ backgroundColor: lvColor(workLevel(pal, workFilter)) }"
+            :title="`${workFilter} Lv ${workLevel(pal, workFilter)}`"
+          >
+            {{ workLevel(pal, workFilter) }}
+          </span>
           <img
             v-if="!broken.has(pal.id)"
             :src="icon(pal.id)"
