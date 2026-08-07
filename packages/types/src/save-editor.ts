@@ -144,7 +144,9 @@ export const giveItemInputSchema = z.object({
     .min(1)
     .max(120)
     .regex(/^[A-Za-z0-9_]+$/),
-  count: z.number().int().min(1).max(9999),
+  // High cap so gold (the `Money` item, effectively unbounded) can be topped up;
+  // normal items just clamp to their own max stack in-game.
+  count: z.number().int().min(1).max(9_999_999),
 })
 export type GiveItemInput = z.infer<typeof giveItemInputSchema>
 

@@ -1,6 +1,14 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import { Loader2, Database, Utensils, ArrowUpNarrowWide, Gauge, Sparkles } from 'lucide-vue-next'
+import {
+  Loader2,
+  Database,
+  Utensils,
+  ArrowUpNarrowWide,
+  Gauge,
+  Sparkles,
+  Coins,
+} from 'lucide-vue-next'
 import { Button, Input } from '@tsuki/ui'
 import type { PalPlayer, PalSummary, PlayerStats } from '@tsuki/types'
 import { api } from '@/lib/api'
@@ -86,6 +94,20 @@ function askSetLevel(): void {
   queue.mutate({ type: 'playerLevel', uid, label: `Set ${name.value} to level ${lvl}`, level: lvl })
 }
 
+// Gold is the `Money` inventory item — adding it to the inventory raises the total.
+const goldInput = ref('10000')
+function askGold(): void {
+  const uid = props.player?.playerId
+  const amount = Math.floor(Number(goldInput.value))
+  if (!uid || !Number.isFinite(amount) || amount < 1) return
+  queue.mutate({
+    type: 'giveItem',
+    uid,
+    label: `Give ${amount.toLocaleString()} gold to ${name.value}`,
+    item: { staticId: 'Money', count: amount },
+  })
+}
+
 const rows = computed(() => {
   const s = stats.value
   if (!s?.found) return []
@@ -153,6 +175,23 @@ const rows = computed(() => {
                   @click="askSetLevel"
                 >
                   <ArrowUpNarrowWide /> Set
+                </Button>
+              </div>
+              <div class="flex items-center gap-1.5">
+                <Input
+                  v-model="goldInput"
+                  type="number"
+                  min="1"
+                  class="w-full"
+                  placeholder="Gold"
+                />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  :disabled="queue.isPending.value"
+                  @click="askGold"
+                >
+                  <Coins /> Add gold
                 </Button>
               </div>
             </div>
