@@ -48,8 +48,14 @@ function lastSeen(iso: string | null): string {
 
     <!-- Admin: editable, save-backed cards -->
     <template v-else-if="useSave">
+      <div
+        v-if="saveQuery.isError.value"
+        class="rounded-2xl border border-border bg-card p-6 text-sm text-amber-400"
+      >
+        Couldn't read guilds from the save: {{ (saveQuery.error.value as Error)?.message }}
+      </div>
       <PagePlaceholder
-        v-if="saveGuilds.length === 0"
+        v-else-if="saveGuilds.length === 0"
         :icon="Shield"
         title="No guilds yet"
         description="Guilds will appear here once players form them."
@@ -63,7 +69,15 @@ function lastSeen(iso: string | null): string {
         >
           <Card class="transition-colors hover:border-primary/40">
             <CardHeader class="flex-row flex-wrap items-center justify-between gap-3">
-              <h3 class="text-base font-semibold tracking-tight">{{ guild.name }}</h3>
+              <h3 class="flex items-center gap-2 text-base font-semibold tracking-tight">
+                {{ guild.name }}
+                <span
+                  v-if="guild.solo"
+                  class="rounded-full bg-sky-500/15 px-2 py-0.5 text-[11px] font-medium text-sky-400"
+                >
+                  Personal
+                </span>
+              </h3>
               <div class="flex items-center gap-2 text-xs text-muted-foreground">
                 <span
                   class="inline-flex items-center gap-1.5 rounded-full border border-border px-2.5 py-1"

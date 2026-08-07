@@ -124,6 +124,12 @@ const stats = computed(() => {
       Reading the save…
     </div>
     <div
+      v-else-if="query.isError.value"
+      class="rounded-2xl border border-border bg-card p-8 text-center text-sm text-amber-400"
+    >
+      Couldn't read guilds from the save: {{ (query.error.value as Error)?.message }}
+    </div>
+    <div
       v-else-if="!guild"
       class="rounded-2xl border border-border bg-card p-8 text-center text-sm text-muted-foreground"
     >
@@ -171,7 +177,13 @@ const stats = computed(() => {
                   <X class="size-4" />
                 </Button>
               </div>
-              <div class="flex flex-wrap gap-2 text-xs text-muted-foreground">
+              <div class="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                <span
+                  v-if="guild.solo"
+                  class="inline-flex items-center gap-1 rounded-full bg-sky-500/15 px-2.5 py-1 font-medium text-sky-400"
+                >
+                  Personal guild
+                </span>
                 <span
                   v-for="s in stats"
                   :key="s.label"
@@ -209,7 +221,7 @@ const stats = computed(() => {
               {{ isOnline(m.uid) ? 'Online' : `Seen ${lastSeen(m.lastOnline)}` }}
             </span>
 
-            <div v-if="canWrite && !m.isAdmin" class="ml-auto flex gap-1.5">
+            <div v-if="canWrite && !guild.solo && !m.isAdmin" class="ml-auto flex gap-1.5">
               <Button
                 size="sm"
                 variant="ghost"

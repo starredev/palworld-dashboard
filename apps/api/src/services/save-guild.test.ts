@@ -68,11 +68,47 @@ function rawData(json: ReturnType<typeof level>) {
   return json.worldSaveData.value.GroupSaveDataMap.value[0].value.RawData.value
 }
 
+/** A personal guild (EPalGroupType::IndependentGuild) — one owner, no players[]. */
+function soloLevel() {
+  return {
+    worldSaveData: {
+      value: {
+        GroupSaveDataMap: {
+          value: [
+            {
+              key: { value: 'CCCCCCCC-0000-0000-0000-000000000000' },
+              value: {
+                GroupType: { value: { value: 'EPalGroupType::IndependentGuild' } },
+                RawData: {
+                  value: {
+                    group_type: 'EPalGroupType::IndependentGuild',
+                    group_id: 'CCCCCCCC-0000-0000-0000-000000000000',
+                    group_name: 'Carol',
+                    individual_character_handle_ids: [
+                      { guid: '00000000-0000-0000-0000-000000000000', instance_id: 'c-1' },
+                    ],
+                    base_ids: [],
+                    guild_name: 'Carol',
+                    guild_name_2: 'Carol',
+                    player_uid: '33333333-0000-0000-0000-000000000000',
+                    player_info: { last_online_real_time: 0, player_name: 'Carol' },
+                  },
+                },
+              },
+            },
+          ],
+        },
+      },
+    },
+  }
+}
+
 describe('parseGuilds', () => {
   it('reads the guild, members and leader', () => {
     const [g] = parseGuilds(level())
     expect(g.name).toBe('Old Name')
     expect(g.id).toBe('AAAAAAAA000000000000000000000000')
+    expect(g.solo).toBe(false)
     expect(g.members.map((m) => m.name)).toEqual(['Alice', 'Bob'])
     const alice = g.members.find((m) => m.name === 'Alice')
     expect(alice?.isAdmin).toBe(true)
@@ -80,6 +116,24 @@ describe('parseGuilds', () => {
     // 3 handles − 2 members = 1 pal estimate.
     expect(g.palCount).toBe(1)
     expect(g.baseCount).toBe(1)
+  })
+
+  it('reads a personal (independent) guild as a solo, one-member guild', () => {
+    const [g] = parseGuilds(soloLevel())
+    expect(g.solo).toBe(true)
+    expect(g.name).toBe('Carol')
+    expect(g.members).toHaveLength(1)
+    expect(g.members[0]).toMatchObject({ name: 'Carol', isAdmin: true })
+    expect(g.adminUid).toBe('33333333000000000000000000000000')
+  })
+
+  it('renames an independent guild across all name fields', () => {
+    const json = soloLevel()
+    renameGuildMutate(json, 'CCCCCCCC000000000000000000000000', 'Carol Prime')
+    const raw = json.worldSaveData.value.GroupSaveDataMap.value[0].value.RawData.value
+    expect(raw.group_name).toBe('Carol Prime')
+    expect(raw.guild_name).toBe('Carol Prime')
+    expect(raw.guild_name_2).toBe('Carol Prime')
   })
 })
 

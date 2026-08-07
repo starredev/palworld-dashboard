@@ -187,6 +187,8 @@ export const saveGuildSchema = z.object({
   id: z.string(),
   name: z.string(),
   adminUid: z.string().nullable(),
+  /** Personal/solo guild (EPalGroupType::IndependentGuild): one member, no leader/kick. */
+  solo: z.boolean(),
   baseCount: z.number().int().nonnegative(),
   palCount: z.number().int().nonnegative(),
   members: z.array(saveGuildMemberSchema),

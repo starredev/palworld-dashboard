@@ -42,42 +42,83 @@ function dig(node: unknown, ...keys: string[]): unknown {
 }
 const normUid = (s: unknown): string =>
   typeof s === 'string' ? s.replace(/[^0-9a-fA-F]/g, '').toLowerCase() : ''
-const isGuild = (raw: Dict): boolean => raw['group_type'] === 'EPalGroupType::Guild'
+const str = (s: unknown): string | null => (typeof s === 'string' ? s : null)
+// A real (shared) guild has players[] + a leader; an IndependentGuild is one
+// player's personal guild (player_uid + guild_name_2, no admin/players).
+const GUILD = 'EPalGroupType::Guild'
+const INDEPENDENT = 'EPalGroupType::IndependentGuild'
+const isGuildLike = (raw: Dict): boolean =>
+  raw['group_type'] === GUILD || raw['group_type'] === INDEPENDENT
 
-/** Pure: list every guild in the save with members + leader. */
+function member(uid: string, name: unknown, last: unknown, isAdmin: boolean): SaveGuildMember {
+  return {
+    uid: uid.toUpperCase(),
+    name: str(name),
+    // Palworld stores FILETIME-like ticks; expose ISO when it looks valid.
+    lastOnline: ticksToIso(typeof last === 'number' ? last : null),
+    isAdmin,
+  }
+}
+
+/** Pure: list every guild (shared + personal) in the save with members + leader. */
 export function parseGuilds(levelJson: unknown): SaveGuild[] {
   const out: SaveGuild[] = []
   for (const raw of groupRaws(levelJson)) {
-    if (!isGuild(raw)) continue
+    if (!isGuildLike(raw)) continue
     const id = normUid(raw['group_id']).toUpperCase()
     if (!id) continue
-    const adminUid = normUid(raw['admin_player_uid']).toUpperCase() || null
-    const players = Array.isArray(raw['players']) ? raw['players'] : []
-    const members: SaveGuildMember[] = players.map((p) => {
-      const uid = normUid(dig(p, 'player_uid')).toUpperCase()
-      const last = dig(p, 'player_info', 'last_online_real_time')
-      return {
-        uid,
-        name: (dig(p, 'player_info', 'player_name') as string) ?? null,
-        // Palworld stores FILETIME-like ticks; expose ISO when it looks valid.
-        lastOnline: ticksToIso(typeof last === 'number' ? last : null),
-        isAdmin: adminUid !== null && uid === adminUid,
-      }
-    })
+    const solo = raw['group_type'] === INDEPENDENT
+
+    let adminUid: string | null
+    let members: SaveGuildMember[]
+    if (solo) {
+      // One owner; no admin_player_uid — the sole member owns it.
+      const uid = normUid(raw['player_uid']).toUpperCase()
+      adminUid = uid || null
+      members = uid
+        ? [
+            member(
+              uid,
+              dig(raw, 'player_info', 'player_name'),
+              dig(raw, 'player_info', 'last_online_real_time'),
+              true,
+            ),
+          ]
+        : []
+    } else {
+      adminUid = normUid(raw['admin_player_uid']).toUpperCase() || null
+      const players = Array.isArray(raw['players']) ? raw['players'] : []
+      members = players.map((p) => {
+        const uid = normUid(dig(p, 'player_uid')).toUpperCase()
+        return member(
+          uid,
+          dig(p, 'player_info', 'player_name'),
+          dig(p, 'player_info', 'last_online_real_time'),
+          adminUid !== null && uid === adminUid,
+        )
+      })
+    }
+
     const handles = Array.isArray(raw['individual_character_handle_ids'])
       ? raw['individual_character_handle_ids'].length
       : 0
     out.push({
       id,
-      name: (raw['guild_name'] as string) || (raw['group_name'] as string) || 'Unnamed Guild',
+      name:
+        str(raw['guild_name']) ||
+        str(raw['guild_name_2']) ||
+        str(raw['group_name']) ||
+        'Unnamed Guild',
       adminUid,
+      solo,
       baseCount: Array.isArray(raw['base_ids']) ? raw['base_ids'].length : 0,
       // Handles cover players + pals; subtract the member count for a pal estimate.
       palCount: Math.max(0, handles - members.length),
       members,
     })
   }
-  return out.sort((a, b) => b.members.length - a.members.length)
+  // Shared guilds first, then by member count.
+  return out.sort((a, b) => Number(a.solo) - Number(b.solo) || b.members.length - a.members.length)
 }
 
 /** Palworld uses .NET-style 100ns ticks since year 1; 0 / bad values → null. */
@@ -91,20 +132,25 @@ function ticksToIso(ticks: number | null): string | null {
 
 function findGuild(levelJson: unknown, guildId: string): Dict {
   const want = normUid(guildId)
-  const raw = groupRaws(levelJson).find((r) => isGuild(r) && normUid(r['group_id']) === want)
+  const raw = groupRaws(levelJson).find((r) => isGuildLike(r) && normUid(r['group_id']) === want)
   if (!raw) throw new Error('Guild not found in the save')
   return raw
 }
 
 export function renameGuildMutate(levelJson: unknown, guildId: string, name: string): void {
   const raw = findGuild(levelJson, guildId)
-  // The in-game name lives in both fields — keep them in sync.
+  // The in-game name can live in several fields depending on the group type —
+  // only overwrite the ones that already exist so encode stays positional-safe.
   raw['group_name'] = name
-  raw['guild_name'] = name
+  if ('guild_name' in raw) raw['guild_name'] = name
+  if ('guild_name_2' in raw) raw['guild_name_2'] = name
 }
 
 export function setGuildLeaderMutate(levelJson: unknown, guildId: string, memberUid: string): void {
   const raw = findGuild(levelJson, guildId)
+  if (raw['group_type'] === INDEPENDENT) {
+    throw new Error('A personal guild has only one member — no leader to change')
+  }
   const want = normUid(memberUid)
   const players = Array.isArray(raw['players']) ? raw['players'] : []
   const member = players.find((p) => normUid(dig(p, 'player_uid')) === want)
@@ -119,6 +165,9 @@ export function kickGuildMemberMutate(
   memberUid: string,
 ): void {
   const raw = findGuild(levelJson, guildId)
+  if (raw['group_type'] === INDEPENDENT) {
+    throw new Error('A personal guild has only one member and cannot be kicked')
+  }
   const want = normUid(memberUid)
   if (normUid(raw['admin_player_uid']) === want) {
     throw new Error('Cannot kick the guild leader — hand leadership over first')
