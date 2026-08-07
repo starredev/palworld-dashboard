@@ -138,6 +138,9 @@ const envSchema = z.object({
   // ---- Activity / audit log (persisted on the backups volume) ----
   AUDIT_LOG_PATH: z.string().default('/backups/tsuki-audit.json'),
 
+  // ---- Accumulated wild-pal sightings for map habitat zones ----
+  SIGHTINGS_PATH: z.string().default('/backups/tsuki-sightings.json'),
+
   // ---- Guilds & Pals via the live-map's GameData API (optional) ----
   GAMEDATA_URL: emptyToUndefined(z.string().url().optional()),
   GAMEDATA_STATE_PATH: z.string().default('/api/state'),

@@ -85,3 +85,18 @@ export const mapResponseSchema = z.object({
   points: z.array(mapPointSchema),
 })
 export type MapResponse = z.infer<typeof mapResponseSchema>
+
+/** Accumulated wild-pal sighting locations per species (world coords). */
+export const palSightingSchema = z.object({
+  species: z.string(),
+  points: z.array(z.object({ x: z.number(), y: z.number() })),
+  count: z.number().int().nonnegative(),
+  lastSeen: z.string(),
+})
+export type PalSighting = z.infer<typeof palSightingSchema>
+
+export const sightingsResponseSchema = z.object({
+  available: z.boolean(),
+  sightings: z.array(palSightingSchema),
+})
+export type SightingsResponse = z.infer<typeof sightingsResponseSchema>

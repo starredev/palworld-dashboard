@@ -7,6 +7,7 @@ import {
   palsResponseSchema,
   playersRosterResponseSchema,
   mapResponseSchema,
+  sightingsResponseSchema,
   metricsHistoryResponseSchema,
   logsResponseSchema,
   gameConfigSchema,
@@ -51,6 +52,7 @@ import {
   type HealthResponse,
   type LogsResponse,
   type MapResponse,
+  type SightingsResponse,
   type MetricsHistoryResponse,
   type PalsResponse,
   type PlayersRosterResponse,
@@ -274,6 +276,10 @@ export const api = {
 
   getMapPoints(): Promise<MapResponse> {
     return apiFetch('/map', { schema: mapResponseSchema })
+  },
+
+  getMapSightings(): Promise<SightingsResponse> {
+    return apiFetch('/map/sightings', { schema: sightingsResponseSchema })
   },
 
   getMetricsHistory(): Promise<MetricsHistoryResponse> {

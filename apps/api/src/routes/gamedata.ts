@@ -1,5 +1,11 @@
 import type { FastifyInstance } from 'fastify'
-import type { GuildsResponse, MapResponse, PalsResponse, PlayersRosterResponse } from '@tsuki/types'
+import type {
+  GuildsResponse,
+  MapResponse,
+  PalsResponse,
+  PlayersRosterResponse,
+  SightingsResponse,
+} from '@tsuki/types'
 import { authenticate } from '../plugins/auth'
 import {
   getGameData,
@@ -7,6 +13,7 @@ import {
   getPlayerRoster,
   isGameDataConfigured,
 } from '../services/gamedata'
+import { listSightings, recordSightings } from '../services/map-sightings'
 
 /** Guilds & Pals derived from the live-map GameData API. */
 export async function gameDataRoutes(app: FastifyInstance): Promise<void> {
@@ -49,10 +56,22 @@ export async function gameDataRoutes(app: FastifyInstance): Promise<void> {
   app.get('/map', { preHandler: authenticate }, async (): Promise<MapResponse> => {
     if (!isGameDataConfigured()) return { available: false, points: [] }
     try {
-      return { available: true, points: await getMapPoints() }
+      const points = await getMapPoints()
+      // Accumulate wild sightings so the map can show roam zones over time.
+      try {
+        recordSightings(points, Date.now())
+      } catch (error) {
+        app.log.warn({ error }, 'sighting record failed')
+      }
+      return { available: true, points }
     } catch (error) {
       app.log.warn({ error }, 'gamedata fetch failed')
       return { available: false, points: [] }
     }
+  })
+
+  // Accumulated wild-pal roam zones (grows as the map is watched over time).
+  app.get('/map/sightings', { preHandler: authenticate }, async (): Promise<SightingsResponse> => {
+    return { available: isGameDataConfigured(), sightings: listSightings() }
   })
 }

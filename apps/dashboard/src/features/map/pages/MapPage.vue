@@ -19,6 +19,15 @@ const map = useQuery({
   queryFn: () => api.getMapPoints(),
   refetchInterval: 20_000,
 })
+// Accumulated wild-pal roam zones — grows the longer the map is watched.
+const sightings = useQuery({
+  queryKey: ['mapSightings'],
+  queryFn: () => api.getMapSightings(),
+  refetchInterval: 60_000,
+})
+const sightingList = computed(() => sightings.data.value?.sightings ?? [])
+const sightingPoints = (sp: string) =>
+  sightingList.value.find((s) => s.species.toLowerCase() === sp.toLowerCase())?.points ?? []
 
 const points = computed(() => [...(map.data.value?.points ?? []), ...pois])
 const unavailable = computed(() => map.data.value && !map.data.value.available)
@@ -48,9 +57,13 @@ watch(
   { immediate: true },
 )
 
+// Species you can look up = currently spawned wild pals + everything ever seen.
 const wildSpecies = computed(() =>
   [
-    ...new Set(points.value.filter((p) => p.kind === 'wild' && p.detail).map((p) => p.detail!)),
+    ...new Set([
+      ...points.value.filter((p) => p.kind === 'wild' && p.detail).map((p) => p.detail!),
+      ...sightingList.value.map((s) => s.species),
+    ]),
   ].sort((a, b) => a.localeCompare(b)),
 )
 const speciesMatch = (detail: string | null) =>
@@ -106,14 +119,18 @@ function clusterAreas(pts: { x: number; y: number }[]): { x: number; y: number; 
     return { x: cx, y: cy, r }
   })
 }
-const speciesAreas = computed(() =>
-  species.value
-    ? clusterAreas(
-        points.value
-          .filter((p) => p.kind === 'wild' && speciesMatch(p.detail))
-          .map((p) => ({ x: p.x, y: p.y })),
-      )
-    : [],
+// Roam zones combine what's live now with everything we've accumulated, so a
+// species shows its area even when nothing is spawned this moment.
+const speciesAreas = computed(() => {
+  if (!species.value) return []
+  const live = points.value
+    .filter((p) => p.kind === 'wild' && speciesMatch(p.detail))
+    .map((p) => ({ x: p.x, y: p.y }))
+  const all = [...live, ...sightingPoints(species.value)]
+  return all.length ? clusterAreas(all) : []
+})
+const sightingCount = computed(
+  () => sightingPoints(species.value).length + (species.value ? wildMatchCount.value : 0),
 )
 
 const liveMapUrl = computed(() => {
@@ -206,6 +223,9 @@ function count(kind: MapPointKind): number {
         </select>
         <span v-if="species" class="text-xs text-muted-foreground">
           {{ wildMatchCount }} in the world
+          <span v-if="sightingCount > wildMatchCount" class="text-muted-foreground/60">
+            · {{ sightingCount }} spots seen over time
+          </span>
         </span>
         <button
           v-if="species"
