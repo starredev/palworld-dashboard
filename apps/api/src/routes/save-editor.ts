@@ -11,6 +11,7 @@ import {
   type PlayerStats,
   giveItemInputSchema,
   type InventoryResponse,
+  type LockedChestsResponse,
   type PaldeckResponse,
   type SaveEditorStatus,
   type SavePlayersResponse,
@@ -23,6 +24,7 @@ import { isSaveEditAvailable } from '../services/save-edit'
 import { readPlayerLocation, teleportPlayer } from '../services/save-teleport'
 import { giveTechPoints, readPlayerDetail } from '../services/save-player-fields'
 import { giveItem, isInventoryAvailable, readInventory } from '../services/save-inventory'
+import { isChestsAvailable, readLockedChests } from '../services/save-chests'
 import { readGuildsFromSave } from '../services/save-guild'
 import {
   clonePalInLevel,
@@ -159,6 +161,24 @@ export async function saveEditorRoutes(app: FastifyInstance): Promise<void> {
       } catch (error) {
         reply.log.error(error)
         return reply.status(500).send({ message: (error as Error).message })
+      }
+    },
+  )
+
+  // Read-only (admin — exposes passwords): the player's password-locked storage
+  // chests, decoded from MapObjectSaveData. Heavy (full Level.sav decode).
+  app.get<{ Params: UidParams }>(
+    '/save/players/:uid/locked-chests',
+    { preHandler: requireAdmin },
+    async (req, reply): Promise<LockedChestsResponse> => {
+      if (!isChestsAvailable() || !isLevelAvailable()) {
+        return reply.status(503).send({ message: 'Chest reading is not available' })
+      }
+      try {
+        return { available: true, chests: await readLockedChests(req.params.uid) }
+      } catch (error) {
+        reply.log.error(error)
+        return reply.status(400).send({ message: (error as Error).message })
       }
     },
   )

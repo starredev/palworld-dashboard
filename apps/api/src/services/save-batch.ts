@@ -33,6 +33,7 @@ import {
   palBoxContainerGuid,
 } from './save-inventory'
 import { kickGuildMemberMutate, renameGuildMutate, setGuildLeaderMutate } from './save-guild'
+import { isChestsAvailable, unlockChestMutate } from './save-chests'
 
 const run = promisify(execFile)
 const stateSchema = z.object({ ops: z.array(saveOpSchema).default([]) })
@@ -99,6 +100,7 @@ function applyLevelOp(
   if (op.type === 'guildRename') return renameGuildMutate(json, op.guildId, op.name)
   if (op.type === 'guildLeader') return setGuildLeaderMutate(json, op.guildId, op.memberUid)
   if (op.type === 'guildKick') return kickGuildMemberMutate(json, op.guildId, op.memberUid)
+  if (op.type === 'chestUnlock') return unlockChestMutate(json, op.chestId)
   const params = findPlayerParamsRef(json, op.uid)
   if (!params) throw new Error('Player not found in Level.sav')
   if (op.type === 'playerLevel') setPlayerLevel(params, op.level)
@@ -163,6 +165,8 @@ export async function applyBatch(app: FastifyInstance): Promise<BatchApplyResult
     // --- Level.sav edits (one shared decode/re-encode) ---
     if (levelOps.length) {
       const needItems = levelOps.some((o) => o.type === 'giveItem')
+      const needChests = levelOps.some((o) => o.type === 'chestUnlock')
+      if (needChests && !isChestsAvailable()) throw new Error('Chest editing is not available')
       const guids: Record<string, string> = {}
       if (needItems) {
         if (!isInventoryAvailable()) throw new Error('Inventory editing is not available')
@@ -180,16 +184,20 @@ export async function applyBatch(app: FastifyInstance): Promise<BatchApplyResult
       const sav = levelSavPath()
       let jsonPath = `${sav}.json`
       const env = loadEnv()
-      if (needItems) {
+      // Chest ops need MapObjectSaveData decoded → full decode (which also
+      // decodes item slots, so it covers give-item too). Otherwise use the
+      // lighter items-only decode, or the plain decode when neither is needed.
+      const convertScript = needChests
+        ? 'convert_full.py'
+        : needItems
+          ? 'convert_with_items.py'
+          : null
+      if (convertScript) {
         if (existsSync(jsonPath)) rmSync(jsonPath)
-        await run(
-          env.PYTHON_BIN,
-          [join(env.SAVE_TOOLS_DIR, 'convert_with_items.py'), sav, jsonPath],
-          {
-            cwd: env.SAVE_TOOLS_DIR,
-            maxBuffer: 256 * 1024 * 1024,
-          },
-        )
+        await run(env.PYTHON_BIN, [join(env.SAVE_TOOLS_DIR, convertScript), sav, jsonPath], {
+          cwd: env.SAVE_TOOLS_DIR,
+          maxBuffer: 256 * 1024 * 1024,
+        })
       } else {
         jsonPath = await savToJson(sav)
       }

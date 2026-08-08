@@ -16,6 +16,7 @@ import { useQueueOp } from '@/composables/use-save-batch'
 import { usePalIcons } from '../use-pal-icons'
 import PalEditDialog from './PalEditDialog.vue'
 import PlayerInventory from './PlayerInventory.vue'
+import PlayerLockedChests from './PlayerLockedChests.vue'
 import PlayerStatsDialog from './PlayerStatsDialog.vue'
 
 const props = defineProps<{ player: PalPlayer | null; canEdit?: boolean; auto?: boolean }>()
@@ -257,6 +258,8 @@ const rows = computed(() => {
         </div>
 
         <PlayerInventory :uid="player?.playerId ?? null" :can-edit="canEdit" />
+
+        <PlayerLockedChests :uid="player?.playerId ?? null" :can-edit="canEdit" />
       </template>
     </template>
 

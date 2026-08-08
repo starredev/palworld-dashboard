@@ -73,6 +73,9 @@ RUN mkdir -p /opt/palworld-save-tools /tmp/hostfix \
 COPY apps/api/vendor/item_container_slots.py \
      /opt/palworld-save-tools/palworld_save_tools/rawdata/item_container_slots.py
 COPY apps/api/vendor/convert_with_items.py /opt/palworld-save-tools/convert_with_items.py
+# Full-decode script (all custom decoders incl. MapObjectSaveData) for reading
+# and editing map-object data such as chest password locks.
+COPY apps/api/vendor/convert_full.py /opt/palworld-save-tools/convert_full.py
 
 # Own the backups mount point as `node` so the named volume is seeded with
 # node:node ownership (Docker copies the image dir's perms into a fresh volume),

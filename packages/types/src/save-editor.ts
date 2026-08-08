@@ -150,6 +150,33 @@ export const giveItemInputSchema = z.object({
 })
 export type GiveItemInput = z.infer<typeof giveItemInputSchema>
 
+/**
+ * A password-locked storage chest, read from Level.sav's MapObjectSaveData
+ * (the concrete model's `PasswordLock` module). `id` is the map-object instance
+ * id used to target the chest for an unlock. `password` is only exposed on the
+ * admin-gated read endpoint.
+ */
+export const lockedChestSchema = z.object({
+  id: z.string(),
+  /** Raw MapObjectId, e.g. "ItemChest_02". */
+  kind: z.string(),
+  /** Friendly label, e.g. "Wooden Chest". */
+  label: z.string(),
+  ownerUid: z.string().nullable(),
+  ownerName: z.string().nullable(),
+  password: z.string(),
+  /** Names (or uid prefixes) of players who have unlocked it. */
+  access: z.array(z.string()),
+  location: vec3Schema,
+})
+export type LockedChest = z.infer<typeof lockedChestSchema>
+
+export const lockedChestsResponseSchema = z.object({
+  available: z.boolean(),
+  chests: z.array(lockedChestSchema),
+})
+export type LockedChestsResponse = z.infer<typeof lockedChestsResponseSchema>
+
 /** A player as listed from the save itself (works for offline players too). */
 export const savePlayerSchema = z.object({
   uid: z.string(),
@@ -306,6 +333,13 @@ const guildKickOp = {
   label: z.string(),
   memberUid: z.string(),
 }
+// Clear a storage chest's password lock (MapObjectSaveData). `chestId` is the
+// map-object instance id from the locked-chests read.
+const chestUnlockOp = {
+  type: z.literal('chestUnlock'),
+  chestId: z.string(),
+  label: z.string(),
+}
 
 export const saveOpInputSchema = z.discriminatedUnion('type', [
   z.object(teleportOp),
@@ -320,6 +354,7 @@ export const saveOpInputSchema = z.discriminatedUnion('type', [
   z.object(guildRenameOp),
   z.object(guildLeaderOp),
   z.object(guildKickOp),
+  z.object(chestUnlockOp),
 ])
 export type SaveOpInput = z.infer<typeof saveOpInputSchema>
 
@@ -336,6 +371,7 @@ export const saveOpSchema = z.discriminatedUnion('type', [
   z.object({ ...guildRenameOp, id: z.string() }),
   z.object({ ...guildLeaderOp, id: z.string() }),
   z.object({ ...guildKickOp, id: z.string() }),
+  z.object({ ...chestUnlockOp, id: z.string() }),
 ])
 export type SaveOp = z.infer<typeof saveOpSchema>
 
