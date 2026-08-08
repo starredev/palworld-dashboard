@@ -1,8 +1,24 @@
 # Tsuki Panel
 
+**The all-in-one control panel for your Palworld server.** Monitor it, configure it, and deep-edit the save — all from one fast, self-hosted dashboard.
+
+![License: MIT](https://img.shields.io/badge/license-MIT-8b5cf6)
+![Vue 3](https://img.shields.io/badge/Vue-3-42b883)
+![Fastify](https://img.shields.io/badge/Fastify-5-000000)
+![TypeScript](https://img.shields.io/badge/TypeScript-strict-3178c6)
+![Docker](https://img.shields.io/badge/deploy-Docker-2496ed)
+![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen)
+
 A modern, open-source management platform for Palworld servers — with a UX inspired by Vercel, Linear, Railway and Grafana. Dark-mode, responsive, and built as a typed monorepo.
 
 Run your whole server from one panel: watch live players and metrics, browse the Paldeck and crafting tree, see where pals roam on the map — and, when the save is mounted, deep-edit players, pals, guilds and inventories through a safe, batched save editor.
+
+### Why Tsuki Panel?
+
+- **One panel, whole server** — players, guilds, pals, config, backups and the map, instead of a pile of tools and RCON commands.
+- **A real save editor, done safely** — every edit is queued, previewed, and applied in one restart with an automatic backup. No raw hex, no guesswork.
+- **Self-hosted & private** — your data stays on your box. One port, no cross-origin, same-origin cookies.
+- **Built to last** — typed end-to-end (TypeScript + Zod), tested, and Dockerized for a one-command deploy.
 
 ## Features
 
@@ -41,6 +57,18 @@ Queue any number of edits, then apply them all with **one server restart** — a
 - **Toasts everywhere** — every queued edit and apply gives clear in-app feedback.
 
 > The save editor reads and writes the current Oodle-compressed Palworld save format. Edits are queued and previewed before anything is written, and each apply is backed up automatically — but always test on a copy first.
+
+## Screenshots
+
+_Coming soon._ Add captures to `docs/screenshots/` and uncomment the grid below.
+
+<!-- Screenshot grid — drop the four PNGs into docs/screenshots/ and remove these comment markers.
+|                   Overview                    |                  Live map                  |
+| :-------------------------------------------: | :----------------------------------------: |
+|  ![Overview](docs/screenshots/overview.png)   |   ![Live map](docs/screenshots/map.png)    |
+|               **Player editor**               |               **Paldeck**                  |
+| ![Player editor](docs/screenshots/player.png) | ![Paldeck](docs/screenshots/paldeck.png)   |
+-->
 
 ## Architecture
 
