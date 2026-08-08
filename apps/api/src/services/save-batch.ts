@@ -18,6 +18,7 @@ import { playerSavePath } from './save-teleport'
 import {
   applyPalEdit,
   clonePalMutate,
+  copyPalMutate,
   findPalRef,
   findPlayerParamsRef,
   levelSavPath,
@@ -25,7 +26,12 @@ import {
   setPlayerLevel,
   setPlayerStats,
 } from './save-level'
-import { addItemToContainer, commonContainerGuid, isInventoryAvailable } from './save-inventory'
+import {
+  addItemToContainer,
+  commonContainerGuid,
+  isInventoryAvailable,
+  palBoxContainerGuid,
+} from './save-inventory'
 import { kickGuildMemberMutate, renameGuildMutate, setGuildLeaderMutate } from './save-guild'
 
 const run = promisify(execFile)
@@ -68,8 +74,18 @@ export function clearOps(): void {
 }
 
 /** Apply one Level.sav op to the parsed (items-enabled) Level.sav JSON. */
-function applyLevelOp(json: unknown, op: SaveOp, guids: Record<string, string>): void {
+function applyLevelOp(
+  json: unknown,
+  op: SaveOp,
+  guids: Record<string, string>,
+  boxGuids: Record<string, string>,
+): void {
   if (op.type === 'palClone') return clonePalMutate(json, op.uid, op.instanceId)
+  if (op.type === 'palCopy') {
+    const box = boxGuids[op.toUid]
+    if (!box) throw new Error('Target Pal Box container not found')
+    return copyPalMutate(json, op.fromUid, op.instanceId, op.toUid, box)
+  }
   if (op.type === 'giveItem') {
     const g = guids[op.uid]
     if (!g) throw new Error('Inventory container not found')
@@ -155,6 +171,12 @@ export async function applyBatch(app: FastifyInstance): Promise<BatchApplyResult
             guids[o.uid] = await commonContainerGuid(o.uid)
         }
       }
+      // pal-copy needs each target's Pal Box container guid (from their player file).
+      const boxGuids: Record<string, string> = {}
+      for (const o of levelOps) {
+        if (o.type === 'palCopy' && !boxGuids[o.toUid])
+          boxGuids[o.toUid] = await palBoxContainerGuid(o.toUid)
+      }
       const sav = levelSavPath()
       let jsonPath = `${sav}.json`
       const env = loadEnv()
@@ -175,7 +197,7 @@ export async function applyBatch(app: FastifyInstance): Promise<BatchApplyResult
         const json = JSON.parse(await readFile(jsonPath, 'utf8'))
         for (const o of levelOps) {
           try {
-            applyLevelOp(json, o, guids)
+            applyLevelOp(json, o, guids, boxGuids)
             applied++
           } catch (e) {
             failed.push({ label: o.label, error: (e as Error).message })

@@ -273,6 +273,14 @@ const palCloneOp = {
   label: z.string(),
   instanceId: z.string(),
 }
+// Copy a pal from one player's storage into another player's Pal Box.
+const palCopyOp = {
+  type: z.literal('palCopy'),
+  fromUid: z.string(),
+  toUid: z.string(),
+  label: z.string(),
+  instanceId: z.string(),
+}
 const giveOp = {
   type: z.literal('giveItem'),
   uid: z.string(),
@@ -307,6 +315,7 @@ export const saveOpInputSchema = z.discriminatedUnion('type', [
   z.object(statsOp),
   z.object(palEditOp),
   z.object(palCloneOp),
+  z.object(palCopyOp),
   z.object(giveOp),
   z.object(guildRenameOp),
   z.object(guildLeaderOp),
@@ -322,6 +331,7 @@ export const saveOpSchema = z.discriminatedUnion('type', [
   z.object({ ...statsOp, id: z.string() }),
   z.object({ ...palEditOp, id: z.string() }),
   z.object({ ...palCloneOp, id: z.string() }),
+  z.object({ ...palCopyOp, id: z.string() }),
   z.object({ ...giveOp, id: z.string() }),
   z.object({ ...guildRenameOp, id: z.string() }),
   z.object({ ...guildLeaderOp, id: z.string() }),

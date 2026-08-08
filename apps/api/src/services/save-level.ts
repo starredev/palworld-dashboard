@@ -601,6 +601,136 @@ export function clonePalInLevel(
   )
 }
 
+/** The exact stored PlayerUId GUID string for a player (dashed form), or null. */
+function playerOwnerGuid(json: unknown, uid: string): string | null {
+  for (const entry of characterEntries(json)) {
+    const p = saveParam(entry)
+    if (p && isPlayerParams(p) && uidMatches(dig(entry, 'key', 'PlayerUId', 'value'), uid)) {
+      const g = dig(entry, 'key', 'PlayerUId', 'value')
+      return typeof g === 'string' ? g : null
+    }
+  }
+  return null
+}
+
+/** The group_id (dashed GUID string) of the guild a player belongs to, or null. */
+function groupIdForUid(json: unknown, uid: string): string | null {
+  for (const g of arrOf(json, 'GroupSaveDataMap')) {
+    const raw = dig(g, 'value', 'RawData', 'value')
+    if (!raw || typeof raw !== 'object') continue
+    const r = raw as Record<string, unknown>
+    const players = Array.isArray(r['players']) ? r['players'] : []
+    const member =
+      uidMatches(r['admin_player_uid'], uid) ||
+      uidMatches(r['player_uid'], uid) ||
+      players.some((p) => uidMatches(dig(p, 'player_uid'), uid))
+    if (member && typeof r['group_id'] === 'string') return r['group_id']
+  }
+  return null
+}
+
+/**
+ * Copy a pal from one player's storage into ANOTHER player's Pal Box. Deep-copies
+ * the source entry, then re-owns it to the target: new InstanceId, OwnerPlayerUId
+ * + OldOwnerPlayerUIds → target, SlotID.ContainerId → target's box (guid resolved
+ * from their player file), group_id + guild handle → target's guild, and a fresh
+ * box slot. Base-assignment refs are dropped so the copy is a clean box pal.
+ */
+export function copyPalMutate(
+  json: unknown,
+  fromUid: string,
+  sourceInstanceId: string,
+  toUid: string,
+  boxGuidHex: string,
+): void {
+  const target = sourceInstanceId.replace(/[^0-9a-fA-F]/g, '').toLowerCase()
+  const entries = arrOf(json, 'CharacterSaveParameterMap')
+  const source = entries.find((e) => {
+    const p = saveParam(e)
+    return (
+      p &&
+      !isPlayerParams(p) &&
+      uidMatches(dig(p, 'OwnerPlayerUId', 'value'), fromUid) &&
+      String(dig(e, 'key', 'InstanceId', 'value'))
+        .replace(/[^0-9a-fA-F]/g, '')
+        .toLowerCase() === target
+    )
+  })
+  if (!source) throw new Error('Source pal not found')
+
+  const ownerGuid = playerOwnerGuid(json, toUid)
+  if (!ownerGuid) throw new Error('Target player not found in the save')
+  const groupId = groupIdForUid(json, toUid)
+  if (!groupId) throw new Error("Target player's guild not found in the save")
+
+  const boxHex = hex(boxGuidHex)
+  const container = arrOf(json, 'CharacterContainerSaveData').find(
+    (c) => hex(dig(c, 'key', 'ID', 'value')) === boxHex,
+  )
+  const slots = dig(container, 'value', 'Slots', 'value', 'values')
+  if (!Array.isArray(slots) || slots.length === 0) {
+    throw new Error("Target player's Pal Box container not found")
+  }
+  const containerIdStr = dig(container, 'key', 'ID', 'value')
+
+  const clone: unknown = JSON.parse(JSON.stringify(source))
+  const newId = randomUUID()
+  setV(dig(clone, 'key', 'InstanceId'), newId)
+  setV(dig(clone, 'key', 'PlayerUId'), ZERO_GUID)
+
+  const cp = saveParam(clone)
+  if (!cp) throw new Error('Clone has no SaveParameter')
+
+  // Re-own to the target player.
+  setV(cp['OwnerPlayerUId'], ownerGuid)
+  const oldOwners = dig(cp['OldOwnerPlayerUIds'], 'value')
+  if (oldOwners && typeof oldOwners === 'object') {
+    ;(oldOwners as Record<string, unknown>)['values'] = [ownerGuid]
+  }
+  // A deposited box pal must not keep the source's base-assignment references.
+  delete cp['OwnerMapObjectModelId']
+  delete cp['OwnerMapObjectConcreteModelId']
+
+  // Reserve a free slot in the target's Pal Box.
+  const slotNum = numVal(dig(container, 'value', 'SlotNum')) ?? slots.length + 1
+  const used = new Set(slots.map((s) => dig(s, 'SlotIndex', 'value')))
+  let free = -1
+  for (let i = 0; i < slotNum; i++)
+    if (!used.has(i)) {
+      free = i
+      break
+    }
+  if (free < 0) throw new Error("Target player's Pal Box is full")
+  setV(dig(cp['SlotID'], 'value', 'ContainerId', 'value', 'ID'), containerIdStr)
+  setV(dig(cp['SlotID'], 'value', 'SlotIndex'), free)
+
+  const newSlot: unknown = JSON.parse(JSON.stringify(slots[0]))
+  setV(dig(newSlot, 'SlotIndex'), free)
+  const sraw = dig(newSlot, 'RawData', 'value') as Record<string, unknown> | undefined
+  if (sraw && typeof sraw === 'object') {
+    sraw['instance_id'] = newId
+    sraw['player_uid'] = ZERO_GUID
+    sraw['permission_tribe_id'] = 0
+  }
+  slots.push(newSlot)
+
+  // Move the copy into the target's guild + register its handle there.
+  const rawData = dig(clone, 'value', 'RawData', 'value') as Record<string, unknown> | undefined
+  if (rawData && typeof rawData === 'object') rawData['group_id'] = groupId
+  const group = arrOf(json, 'GroupSaveDataMap').find(
+    (g) => hex(dig(g, 'key', 'value')) === hex(groupId) || hex(dig(g, 'key')) === hex(groupId),
+  )
+  const handles = dig(group, 'value', 'RawData', 'value', 'individual_character_handle_ids')
+  if (Array.isArray(handles) && handles.length) {
+    const h: unknown = JSON.parse(JSON.stringify(handles[0]))
+    ;(h as Record<string, unknown>)['guid'] = ZERO_GUID
+    ;(h as Record<string, unknown>)['instance_id'] = newId
+    handles.push(h)
+  }
+
+  entries.push(clone)
+}
+
 /** Decode Level.sav and count players/pals — cheap validation of the decode path. */
 export async function readLevelSummary(): Promise<Omit<LevelSummary, 'available'>> {
   return parseLevelSummary(await readSaveJson(levelSavPath()))

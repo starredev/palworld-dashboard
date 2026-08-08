@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { X, HeartPulse, Copy, Layers, Plus } from 'lucide-vue-next'
+import { useQuery } from '@tanstack/vue-query'
+import { X, HeartPulse, Copy, Layers, Plus, Send } from 'lucide-vue-next'
 import { Button, Input } from '@tsuki/ui'
 import type { PalSummary } from '@tsuki/types'
+import { api } from '@/lib/api'
 import { useQueueOp } from '@/composables/use-save-batch'
 import { PASSIVES, passiveName, passiveDef, KIND_COLOR } from '../passives'
 
@@ -85,6 +87,35 @@ function queueClone(): void {
       uid: props.uid!,
       instanceId: props.pal!.instanceId!,
       label: `Duplicate pal ${title.value}`,
+    },
+    { onSuccess: done },
+  )
+}
+
+// Copy this pal into another player's Pal Box.
+const copyTarget = ref('')
+watch(
+  () => props.pal,
+  () => (copyTarget.value = ''),
+)
+const savePlayers = useQuery({
+  queryKey: ['savePlayers'],
+  queryFn: () => api.getSavePlayers(),
+  staleTime: 60_000,
+})
+const copyTargets = computed(() =>
+  (savePlayers.data.value?.players ?? []).filter((p) => p.uid !== props.uid),
+)
+function queueCopy(): void {
+  const to = copyTargets.value.find((p) => p.uid === copyTarget.value)
+  if (!to || !props.uid || !props.pal?.instanceId) return
+  queue.mutate(
+    {
+      type: 'palCopy',
+      fromUid: props.uid,
+      toUid: to.uid,
+      instanceId: props.pal.instanceId,
+      label: `Copy ${title.value} → ${to.name ?? to.uid.slice(0, 8)}`,
     },
     { onSuccess: done },
   )
@@ -176,6 +207,30 @@ function queueClone(): void {
           <p v-if="queue.isError.value" class="mt-4 text-xs text-red-400">
             {{ (queue.error.value as Error)?.message ?? 'Failed to queue.' }}
           </p>
+
+          <!-- Copy this pal into another player's Pal Box -->
+          <div v-if="copyTargets.length" class="mt-4 border-t border-border pt-4">
+            <p class="mb-1.5 text-xs font-medium text-muted-foreground">Copy to another player</p>
+            <div class="flex items-center gap-1.5">
+              <select
+                v-model="copyTarget"
+                class="h-8 min-w-0 flex-1 rounded-lg border border-border bg-background px-2 text-xs outline-none focus:ring-2 focus:ring-ring"
+              >
+                <option value="">Pick a player…</option>
+                <option v-for="t in copyTargets" :key="t.uid" :value="t.uid">
+                  {{ t.name ?? t.uid.slice(0, 8) }}
+                </option>
+              </select>
+              <Button
+                variant="outline"
+                size="sm"
+                :disabled="!copyTarget || !canApply || queue.isPending.value"
+                @click="queueCopy"
+              >
+                <Send /> Copy
+              </Button>
+            </div>
+          </div>
 
           <div class="mt-6 flex items-center justify-between gap-2">
             <Button

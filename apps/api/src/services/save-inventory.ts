@@ -197,6 +197,16 @@ export async function commonContainerGuid(uid: string): Promise<string> {
   return guid
 }
 
+/** A player's Pal Box (deposit storage) container guid, from their player file. */
+export async function palBoxContainerGuid(uid: string): Promise<string> {
+  const path = playerSavePath(uid)
+  if (!existsSync(path)) throw new Error('Player save not found')
+  const node = deepFind(await readSaveJson(path), 'PalStorageContainerId')
+  const guid = hex(dig(node, 'value', 'ID', 'value'))
+  if (!guid) throw new Error('Could not resolve the player pal box container')
+  return guid
+}
+
 /** Give a player `count` of `staticId` (their common inventory container). */
 export async function giveItem(
   app: FastifyInstance,

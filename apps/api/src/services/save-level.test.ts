@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   applyPalEdit,
   clonePalMutate,
+  copyPalMutate,
   ensureByte,
   parseLevelPlayers,
   parseLevelSummary,
@@ -353,6 +354,139 @@ describe('clonePalMutate', () => {
 
   it('throws when the source pal is not found', () => {
     expect(() => clonePalMutate(world(), MELVIN, 'ffffffff')).toThrow(/not found/i)
+  })
+})
+
+describe('copyPalMutate', () => {
+  const A = MELVIN
+  const A_GUID = MELVIN_GUID
+  const B = '99998888000000000000000000000000'
+  const B_GUID = '99998888-0000-0000-0000-000000000000'
+  const A_BOX = 'aaaa1111-0000-0000-0000-000000000000'
+  const B_BOX = 'bbbb2222-0000-0000-0000-000000000000'
+  const A_GROUP = 'a0a0a0a0-0000-0000-0000-000000000000'
+  const B_GROUP = 'b0b0b0b0-0000-0000-0000-000000000000'
+  const SRC = 'dddd4444-0000-0000-0000-000000000000'
+
+  function palEntry(inst: string, ownerGuid: string, box: string, group: string) {
+    return {
+      key: { InstanceId: { value: inst }, PlayerUId: { value: '00000000' } },
+      value: {
+        RawData: {
+          value: {
+            object: {
+              SaveParameter: {
+                value: {
+                  CharacterID: { value: 'SheepBall' },
+                  OwnerPlayerUId: { value: ownerGuid, struct_type: 'Guid' },
+                  OldOwnerPlayerUIds: { value: { values: [ownerGuid] } },
+                  SlotID: {
+                    value: {
+                      ContainerId: { value: { ID: { value: box } } },
+                      SlotIndex: { value: 0 },
+                    },
+                  },
+                },
+              },
+            },
+            group_id: group,
+          },
+        },
+      },
+    }
+  }
+  function container(id: string) {
+    return {
+      key: { ID: { value: id } },
+      value: {
+        SlotNum: { value: 30 },
+        Slots: {
+          value: {
+            values: [
+              {
+                SlotIndex: { value: 0 },
+                RawData: { value: { player_uid: '0', instance_id: SRC } },
+              },
+            ],
+          },
+        },
+      },
+    }
+  }
+  function world() {
+    return {
+      properties: {
+        worldSaveData: {
+          value: {
+            CharacterSaveParameterMap: {
+              value: [
+                // Target player B (IsPlayer) so its owner GUID can be resolved.
+                {
+                  key: { InstanceId: { value: 'ee' }, PlayerUId: { value: B_GUID } },
+                  value: {
+                    RawData: {
+                      value: {
+                        object: { SaveParameter: { value: { IsPlayer: { value: true } } } },
+                      },
+                    },
+                  },
+                },
+                palEntry(SRC, A_GUID, A_BOX, A_GROUP),
+              ],
+            },
+            CharacterContainerSaveData: { value: [container(A_BOX), container(B_BOX)] },
+            GroupSaveDataMap: {
+              value: [
+                {
+                  key: { value: B_GROUP },
+                  value: {
+                    RawData: {
+                      value: {
+                        group_id: B_GROUP,
+                        players: [{ player_uid: B_GUID }],
+                        individual_character_handle_ids: [{ guid: '0', instance_id: 'ee' }],
+                      },
+                    },
+                  },
+                },
+              ],
+            },
+          },
+        },
+      },
+    }
+  }
+
+  it('re-owns the copy to the target: owner, box container, group + handle', () => {
+    const json = world()
+    copyPalMutate(json, A, SRC, B, B_BOX)
+    const w = json.properties.worldSaveData.value
+    const chars = w.CharacterSaveParameterMap.value
+    expect(chars).toHaveLength(3)
+    const copy = chars[2] as ReturnType<typeof palEntry>
+    const cp = copy.value.RawData.value.object.SaveParameter.value
+    // New owner + history + fresh instance id, placed in B's box + group.
+    expect(cp.OwnerPlayerUId.value).toBe(B_GUID)
+    expect(cp.OldOwnerPlayerUIds.value.values).toEqual([B_GUID])
+    expect(cp.SlotID.value.ContainerId.value.ID.value).toBe(B_BOX)
+    expect(copy.value.RawData.value.group_id).toBe(B_GROUP)
+    const newId = copy.key.InstanceId.value
+    expect(newId).not.toBe(SRC)
+    // Slot added to B's box (index 1), not A's.
+    const bBox = w.CharacterContainerSaveData.value[1].value.Slots.value.values
+    expect(bBox).toHaveLength(2)
+    expect(bBox[1].RawData.value.instance_id).toBe(newId)
+    expect(w.CharacterContainerSaveData.value[0].value.Slots.value.values).toHaveLength(1)
+    // Handle registered in B's group.
+    const handles = w.GroupSaveDataMap.value[0].value.RawData.value.individual_character_handle_ids
+    expect(handles).toHaveLength(2)
+    expect(handles[1].instance_id).toBe(newId)
+  })
+
+  it('throws when the target player is missing', () => {
+    const json = world()
+    json.properties.worldSaveData.value.CharacterSaveParameterMap.value.splice(0, 1) // drop player B
+    expect(() => copyPalMutate(json, A, SRC, B, B_BOX)).toThrow(/target player/i)
   })
 })
 
