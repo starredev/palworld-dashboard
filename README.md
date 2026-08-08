@@ -2,7 +2,45 @@
 
 A modern, open-source management platform for Palworld servers — with a UX inspired by Vercel, Linear, Railway and Grafana. Dark-mode, responsive, and built as a typed monorepo.
 
-> **Status:** early scaffold. This is the runnable base (Phase 1 in progress) — a dark dashboard shell talking to a Fastify API. Game-server features (players, guilds, pals, metrics, live map) arrive in later phases.
+Run your whole server from one panel: watch live players and metrics, browse the Paldeck and crafting tree, see where pals roam on the map — and, when the save is mounted, deep-edit players, pals, guilds and inventories through a safe, batched save editor.
+
+## Features
+
+Everything below is live in the panel. Save-editing features need the game save mounted (see [Save editing](#save-editing-optional)); the rest just need a REST/RCON connection.
+
+### 🖥️ Server & monitoring
+
+- **Overview** — server status, version, uptime, and players online at a glance.
+- **Insights** — metric history charts (players online, memory) over time.
+- **Live players** — who's online, level and ping, with one-click **kick** and **ban**; plus an offline roster with last-seen.
+- **Logs** — tail raw server logs, and a separate **Activity** feed of panel actions.
+- **Live map** — a coordinate map of players, bases, pals, wild spawns, NPCs and bosses, with toggleable layers.
+  - **Roam zones** — search any pal species and see the areas where it roams, accumulated from live sightings over time.
+
+### ⚙️ Configuration & operations
+
+- **Server config** — edit the real `PalWorldSettings.ini` from the browser: load the live file, save it back (with a `.bak` and preserved unknown keys), and restart to apply.
+- **Scheduled events** — schedule config changes like a **Double EXP weekend**, one-off or **recurring/weekly**.
+- **Restart scheduler** — plan automatic server restarts.
+- **Backups** — snapshot, download and restore world saves; a restore takes a safety backup first.
+
+### 🐾 Pals & crafting
+
+- **Paldeck** — browse every pal with art, elements and stats; track which the server has captured.
+  - **Work-skill ranking** — pick a work skill (Handiwork = crafting, or any of the 12) and rank pals by level to find your best workers.
+- **Crafting planner** — pick a recipe and see the full raw-material breakdown, **including where to get each material** (which pals drop it, and where on the map).
+
+### 🛠️ Save editor (batched, with auto-backups)
+
+Queue any number of edits, then apply them all with **one server restart** — and every apply takes an automatic pre-edit backup first.
+
+- **Players** — teleport (works for Xbox players too), set level, edit stat points (HP/stamina/attack/weight/…), refuel, and **add gold**.
+- **Inventory** — view a player's items (with icons) and **give items** from a searchable, dataset-backed picker.
+- **Pals** — edit level and IVs/talents, **fully heal**, **duplicate** a pal, and add/remove **passive skills** — including the movement-speed passives (Swift/Runner/Nimble) that speed up flying mounts.
+- **Guilds** — a dedicated guild page to **rename** a guild, **hand over leadership**, and **kick members** (personal/solo guilds are supported too).
+- **Toasts everywhere** — every queued edit and apply gives clear in-app feedback.
+
+> The save editor reads and writes the current Oodle-compressed Palworld save format. Edits are queued and previewed before anything is written, and each apply is backed up automatically — but always test on a copy first.
 
 ## Architecture
 
@@ -115,6 +153,21 @@ With `PALWORLD_DATA_DIR` mounted (see above), the **Backups** page can snapshot,
 download and restore your world saves. Backups are stored in a `tsuki-backups`
 volume; a restore takes a `pre-restore` safety backup first and needs a server
 restart to take effect.
+
+### Save editing (optional)
+
+The deep player/pal/guild/inventory editors read and write the game **save
+files** directly. This needs the save dir mounted and Docker container control
+(to stop/start the game while a write happens). The API image bundles the save
+converter, so no extra setup is required beyond the mounts:
+
+| Variable            | Notes                                                               |
+| ------------------- | ------------------------------------------------------------------- |
+| `PALWORLD_SAVE_DIR` | Path to `…/Pal/Saved/SaveGames` inside the API container (mount it) |
+
+Every edit is **queued into a batch** and applied in a single stop → **backup** →
+edit → start cycle, so one restart covers all your changes and a fresh pre-edit
+backup always exists. Without the mount, these pages simply stay hidden.
 
 ### HTTPS
 
