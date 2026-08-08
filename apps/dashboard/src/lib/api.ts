@@ -27,6 +27,7 @@ import {
   saveGuildsResponseSchema,
   inventoryResponseSchema,
   lockedChestsResponseSchema,
+  basesResponseSchema,
   saveBatchSchema,
   batchApplyResultSchema,
   healthResponseSchema,
@@ -74,6 +75,7 @@ import {
   type PlayerStatsInput,
   type InventoryResponse,
   type LockedChestsResponse,
+  type BasesResponse,
   type GiveItemInput,
   type SaveBatch,
   type SaveOpInput,
@@ -333,6 +335,10 @@ export const api = {
     return apiFetch(`/save/players/${encodeURIComponent(uid)}/inventory`, {
       schema: inventoryResponseSchema,
     })
+  },
+
+  getBases(): Promise<BasesResponse> {
+    return apiFetch('/save/bases', { schema: basesResponseSchema })
   },
 
   getLockedChests(uid: string): Promise<LockedChestsResponse> {

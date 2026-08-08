@@ -12,6 +12,7 @@ import {
   giveItemInputSchema,
   type InventoryResponse,
   type LockedChestsResponse,
+  type BasesResponse,
   type PaldeckResponse,
   type SaveEditorStatus,
   type SavePlayersResponse,
@@ -25,6 +26,7 @@ import { readPlayerLocation, teleportPlayer } from '../services/save-teleport'
 import { giveTechPoints, readPlayerDetail } from '../services/save-player-fields'
 import { giveItem, isInventoryAvailable, readInventory } from '../services/save-inventory'
 import { isChestsAvailable, readLockedChests } from '../services/save-chests'
+import { isBasesAvailable, readBases } from '../services/save-bases'
 import { readGuildsFromSave } from '../services/save-guild'
 import {
   clonePalInLevel,
@@ -176,6 +178,23 @@ export async function saveEditorRoutes(app: FastifyInstance): Promise<void> {
       }
       try {
         return { available: true, chests: await readLockedChests(req.params.uid) }
+      } catch (error) {
+        reply.log.error(error)
+        return reply.status(400).send({ message: (error as Error).message })
+      }
+    },
+  )
+
+  // Read-only: every base camp with its guild + build-area radius.
+  app.get(
+    '/save/bases',
+    { preHandler: authenticate },
+    async (_req, reply): Promise<BasesResponse> => {
+      if (!isBasesAvailable()) {
+        return reply.status(503).send({ message: 'Base reading is not available' })
+      }
+      try {
+        return { available: true, bases: await readBases() }
       } catch (error) {
         reply.log.error(error)
         return reply.status(400).send({ message: (error as Error).message })

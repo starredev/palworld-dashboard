@@ -181,6 +181,25 @@ export const lockedChestsResponseSchema = z.object({
 })
 export type LockedChestsResponse = z.infer<typeof lockedChestsResponseSchema>
 
+/**
+ * A base camp from Level.sav's BaseCampSaveData. `areaRange` is the build-area
+ * radius in Unreal units (cm) — divide by 100 for metres (3500 = 35 m default).
+ */
+export const baseCampSchema = z.object({
+  id: z.string(),
+  guildId: z.string().nullable(),
+  guildName: z.string().nullable(),
+  areaRange: z.number(),
+  location: vec3Schema,
+})
+export type BaseCamp = z.infer<typeof baseCampSchema>
+
+export const basesResponseSchema = z.object({
+  available: z.boolean(),
+  bases: z.array(baseCampSchema),
+})
+export type BasesResponse = z.infer<typeof basesResponseSchema>
+
 /** A player as listed from the save itself (works for offline players too). */
 export const savePlayerSchema = z.object({
   uid: z.string(),
@@ -344,6 +363,14 @@ const chestUnlockOp = {
   chestId: z.string(),
   label: z.string(),
 }
+// Set a base camp's build-area radius (BaseCampSaveData area_range, in cm).
+// 500 cm (5 m) to 100000 cm (1000 m); default is 3500 (35 m).
+const baseAreaOp = {
+  type: z.literal('baseArea'),
+  baseId: z.string(),
+  areaRange: z.number().min(500).max(100_000),
+  label: z.string(),
+}
 
 export const saveOpInputSchema = z.discriminatedUnion('type', [
   z.object(teleportOp),
@@ -359,6 +386,7 @@ export const saveOpInputSchema = z.discriminatedUnion('type', [
   z.object(guildLeaderOp),
   z.object(guildKickOp),
   z.object(chestUnlockOp),
+  z.object(baseAreaOp),
 ])
 export type SaveOpInput = z.infer<typeof saveOpInputSchema>
 
@@ -376,6 +404,7 @@ export const saveOpSchema = z.discriminatedUnion('type', [
   z.object({ ...guildLeaderOp, id: z.string() }),
   z.object({ ...guildKickOp, id: z.string() }),
   z.object({ ...chestUnlockOp, id: z.string() }),
+  z.object({ ...baseAreaOp, id: z.string() }),
 ])
 export type SaveOp = z.infer<typeof saveOpSchema>
 

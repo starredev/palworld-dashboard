@@ -34,6 +34,7 @@ import {
 } from './save-inventory'
 import { kickGuildMemberMutate, renameGuildMutate, setGuildLeaderMutate } from './save-guild'
 import { isChestsAvailable, unlockChestMutate } from './save-chests'
+import { setBaseAreaMutate } from './save-bases'
 
 const run = promisify(execFile)
 const stateSchema = z.object({ ops: z.array(saveOpSchema).default([]) })
@@ -101,6 +102,7 @@ function applyLevelOp(
   if (op.type === 'guildLeader') return setGuildLeaderMutate(json, op.guildId, op.memberUid)
   if (op.type === 'guildKick') return kickGuildMemberMutate(json, op.guildId, op.memberUid)
   if (op.type === 'chestUnlock') return unlockChestMutate(json, op.chestId)
+  if (op.type === 'baseArea') return setBaseAreaMutate(json, op.baseId, op.areaRange)
   const params = findPlayerParamsRef(json, op.uid)
   if (!params) throw new Error('Player not found in Level.sav')
   if (op.type === 'playerLevel') setPlayerLevel(params, op.level)
