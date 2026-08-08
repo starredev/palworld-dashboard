@@ -185,6 +185,19 @@ describe('applyPalEdit', () => {
     expect((params.Talent_Defense as { value: { value: number } }).value.value).toBe(80)
   })
 
+  it('writes condensation stars as Rank = stars + 1 (4 stars → Rank 5)', () => {
+    const params: Record<string, unknown> = { Rank: byteNode(1) }
+    applyPalEdit(params, { stars: 4 })
+    expect((params.Rank as { value: { value: number } }).value.value).toBe(5)
+  })
+
+  it('creates a Rank byte from a sibling when the pal has none', () => {
+    const params: Record<string, unknown> = { Talent_HP: byteNode(50) }
+    applyPalEdit(params, { stars: 2 })
+    expect((params.Rank as { value: { value: number }; type: string }).value.value).toBe(3)
+    expect((params.Rank as { type: string }).type).toBe('ByteProperty')
+  })
+
   it('creates a PassiveSkillList node when the pal has none, deduped + capped at 4', () => {
     const params: Record<string, unknown> = { Level: byteNode(10) }
     applyPalEdit(params, {

@@ -169,6 +169,8 @@ export function parsePlayerStats(levelJson: unknown, uid: string): Omit<PlayerSt
         level: byteVal(params['Level']) ?? 1,
         gender: enumVal(params['Gender'])?.split('::').pop() ?? null,
         instanceId: typeof inst === 'string' ? inst : null,
+        // Rank byte is stars + 1 (Rank 1 / absent = 0 stars); clamp to 0–4.
+        stars: Math.min(4, Math.max(0, (byteVal(params['Rank']) ?? 1) - 1)),
         talentHp: byteVal(params['Talent_HP']),
         talentShot: byteVal(params['Talent_Shot']),
         talentDefense: byteVal(params['Talent_Defense']),
@@ -456,6 +458,9 @@ export function setPassives(params: Record<string, unknown>, passives: string[])
 export function applyPalEdit(params: Record<string, unknown>, input: PalEditInput): void {
   if (input.level !== undefined)
     ensureByte(params, 'Level', input.level, ['Rank', 'Talent_HP', 'Talent_Shot', 'Talent_Defense'])
+  if (input.stars !== undefined)
+    // Condensation stars 0–4 → Rank byte 1–5.
+    ensureByte(params, 'Rank', input.stars + 1, ['Talent_HP', 'Talent_Shot', 'Talent_Defense'])
   if (input.talentHp !== undefined)
     ensureByte(params, 'Talent_HP', input.talentHp, ['Talent_Shot', 'Talent_Defense'])
   if (input.talentShot !== undefined)

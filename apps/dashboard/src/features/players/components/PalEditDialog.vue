@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
-import { X, HeartPulse, Copy, Layers, Plus, Send } from 'lucide-vue-next'
+import { X, HeartPulse, Copy, Layers, Plus, Send, Star } from 'lucide-vue-next'
 import { Button, Input } from '@tsuki/ui'
 import type { PalSummary } from '@tsuki/types'
 import { api } from '@/lib/api'
@@ -13,7 +13,7 @@ const emit = defineEmits<{ close: []; done: [] }>()
 
 const done = () => (emit('done'), emit('close'))
 
-const form = ref({ level: '', hp: '', shot: '', defense: '', heal: false })
+const form = ref({ level: '', stars: 0, hp: '', shot: '', defense: '', heal: false })
 // Selected passive ids (prefilled from the pal; unknown ids are preserved).
 const passives = ref<string[]>([])
 const addPick = ref('')
@@ -23,6 +23,7 @@ watch(
   (p) => {
     form.value = {
       level: p?.level != null ? String(p.level) : '',
+      stars: p?.stars ?? 0,
       hp: p?.talentHp != null ? String(p.talentHp) : '0',
       shot: p?.talentShot != null ? String(p.talentShot) : '0',
       defense: p?.talentDefense != null ? String(p.talentDefense) : '0',
@@ -50,6 +51,12 @@ const passivesChanged = computed(() => {
 })
 const kindColor = (id: string) => KIND_COLOR[passiveDef(id)?.kind ?? 'utility']
 
+// Condensation stars 0–4. Clicking a filled star at its own position drops one.
+const starsChanged = computed(() => form.value.stars !== (props.pal?.stars ?? 0))
+function setStars(n: number): void {
+  form.value.stars = form.value.stars === n ? n - 1 : n
+}
+
 const title = computed(
   () => props.pal?.nickname || props.pal?.species.replace('BOSS_', '') || 'Pal',
 )
@@ -73,6 +80,7 @@ function queueEdit(): void {
         talentHp: num(form.value.hp),
         talentShot: num(form.value.shot),
         talentDefense: num(form.value.defense),
+        ...(starsChanged.value ? { stars: form.value.stars } : {}),
         ...(form.value.heal ? { heal: true } : {}),
         ...(passivesChanged.value ? { passives: passives.value } : {}),
       },
@@ -143,8 +151,36 @@ function queueCopy(): void {
           <h2 class="text-base font-semibold tracking-tight">Edit {{ title }}</h2>
           <p class="mt-1 text-xs text-muted-foreground">{{ pal.species.replace('BOSS_', '') }}</p>
 
-          <label class="mt-5 block text-xs font-medium text-muted-foreground">Level</label>
-          <Input v-model="form.level" type="number" class="mt-1.5 w-28" placeholder="Level" />
+          <div class="mt-5 flex items-end gap-6">
+            <div>
+              <label class="block text-xs font-medium text-muted-foreground">Level</label>
+              <Input v-model="form.level" type="number" class="mt-1.5 w-28" placeholder="Level" />
+            </div>
+            <div>
+              <span class="block text-xs font-medium text-muted-foreground"
+                >Stars ({{ form.stars }}/4)</span
+              >
+              <div class="mt-1.5 flex items-center gap-0.5">
+                <button
+                  v-for="n in 4"
+                  :key="n"
+                  type="button"
+                  :aria-label="`${n} star${n === 1 ? '' : 's'}`"
+                  :title="`${n}★`"
+                  @click="setStars(n)"
+                >
+                  <Star
+                    class="size-6 transition-colors"
+                    :class="
+                      n <= form.stars
+                        ? 'fill-amber-400 text-amber-400'
+                        : 'text-muted-foreground/40 hover:text-amber-300'
+                    "
+                  />
+                </button>
+              </div>
+            </div>
+          </div>
 
           <p class="mt-4 text-xs font-medium text-muted-foreground">IVs / Talents (0–100)</p>
           <div class="mt-1.5 grid grid-cols-3 gap-2">

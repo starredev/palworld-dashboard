@@ -246,6 +246,7 @@ const rows = computed(() => {
                   </span>
                   <span class="mt-0.5 block text-[11px] text-muted-foreground">
                     Lv {{ p.level }}
+                    <span v-if="p.stars" class="text-amber-400">· {{ p.stars }}★</span>
                     <span v-if="p.nickname" class="text-muted-foreground/60">
                       · {{ pal.info(p.species)?.name ?? pal.baseId(p.species) }}
                     </span>

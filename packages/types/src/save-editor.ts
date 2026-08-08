@@ -52,6 +52,8 @@ export const palSummarySchema = z.object({
   gender: z.string().nullable(),
   /** GUID that identifies this exact pal — needed to target it for edits. */
   instanceId: z.string().nullable(),
+  /** Condensation stars (0–4). Stored as the `Rank` byte, which is stars + 1. */
+  stars: z.number(),
   talentHp: z.number().nullable(),
   talentShot: z.number().nullable(),
   talentDefense: z.number().nullable(),
@@ -65,6 +67,8 @@ export type PalSummary = z.infer<typeof palSummarySchema>
 export const palEditInputSchema = z
   .object({
     level: z.number().int().min(1).max(100).optional(),
+    /** Condensation stars 0–4 (written as Rank = stars + 1). */
+    stars: z.number().int().min(0).max(4).optional(),
     talentHp: z.number().int().min(0).max(100).optional(),
     talentShot: z.number().int().min(0).max(100).optional(),
     talentDefense: z.number().int().min(0).max(100).optional(),
