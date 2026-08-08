@@ -21,6 +21,26 @@ const bases = useQuery({
   enabled: available,
   staleTime: 60_000,
 })
+// Guilds resolve WHO owns each base (leader + members) — a base belongs to a
+// guild, not a single player.
+const guilds = useQuery({
+  queryKey: ['saveGuilds'],
+  queryFn: () => api.getSaveGuilds(),
+  enabled: available,
+  staleTime: 60_000,
+})
+const guildById = computed(() => new Map((guilds.data.value?.guilds ?? []).map((g) => [g.id, g])))
+const guildOf = (id: string | null) => (id ? (guildById.value.get(id) ?? null) : null)
+function ownerName(id: string | null): string | null {
+  const g = guildOf(id)
+  if (!g) return null
+  const leader = g.members.find((m) => m.isAdmin) ?? (g.solo ? g.members[0] : null)
+  return leader?.name ?? null
+}
+function memberNames(id: string | null): string {
+  const g = guildOf(id)
+  return g ? g.members.map((m) => m.name ?? '?').join(', ') : ''
+}
 
 // Default build radius is 3500 cm = 35 m; presets in metres.
 const PRESETS = [35, 50, 70, 100]
@@ -29,10 +49,25 @@ const metres = (areaRange: number) => Math.round(areaRange / 100)
 // Group bases by guild, each labelled "Base N" in stored order within the guild.
 const groups = computed(() => {
   const list = bases.data.value?.bases ?? []
-  const byGuild = new Map<string, { name: string; items: { base: BaseCamp; index: number }[] }>()
+  const byGuild = new Map<
+    string,
+    {
+      guildId: string | null
+      solo: boolean
+      name: string
+      items: { base: BaseCamp; index: number }[]
+    }
+  >()
   for (const base of list) {
     const key = base.guildId ?? 'none'
-    if (!byGuild.has(key)) byGuild.set(key, { name: base.guildName ?? 'Unaffiliated', items: [] })
+    if (!byGuild.has(key)) {
+      byGuild.set(key, {
+        guildId: base.guildId,
+        solo: guildOf(base.guildId)?.solo ?? false,
+        name: base.guildName ?? 'Unaffiliated',
+        items: [],
+      })
+    }
     const g = byGuild.get(key)!
     g.items.push({ base, index: g.items.length + 1 })
   }
@@ -94,9 +129,32 @@ function setSize(base: BaseCamp, label: string, m: number): void {
       </p>
 
       <div v-for="g in groups" :key="g.name" class="space-y-3">
-        <h2 class="text-sm font-medium text-muted-foreground">
-          {{ g.name }} · {{ g.items.length }} base{{ g.items.length === 1 ? '' : 's' }}
-        </h2>
+        <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+          <h2 class="text-sm font-medium">
+            <RouterLink
+              v-if="g.guildId"
+              :to="{ name: 'guild', params: { id: g.guildId } }"
+              class="hover:underline"
+            >
+              {{ g.name }}
+            </RouterLink>
+            <span v-else>{{ g.name }}</span>
+          </h2>
+          <span class="text-xs text-muted-foreground">
+            · {{ g.items.length }} base{{ g.items.length === 1 ? '' : 's' }}
+            <template v-if="ownerName(g.guildId)">
+              · {{ g.solo ? 'player' : 'leader' }}:
+              <span class="text-foreground">{{ ownerName(g.guildId) }}</span>
+            </template>
+          </span>
+          <span
+            v-if="!g.solo && memberNames(g.guildId)"
+            class="w-full truncate text-[11px] text-muted-foreground/70"
+            :title="memberNames(g.guildId)"
+          >
+            Members: {{ memberNames(g.guildId) }}
+          </span>
+        </div>
         <div class="grid gap-3 sm:grid-cols-2">
           <div
             v-for="{ base, index } in g.items"
