@@ -101,6 +101,8 @@ export async function readInventory(uid: string): Promise<Omit<InventoryResponse
 
 // ---- Give items (write) ----
 
+const ZERO_GUID = '00000000-0000-0000-0000-000000000000'
+
 interface SlotRaw {
   count: number
   item: { static_id: string }
@@ -112,10 +114,26 @@ function slotRaw(slot: unknown): SlotRaw | null {
     : null
 }
 
+/** A fresh packed slot value (matches item_container_slots.py encode_bytes). */
+function packedSlot(slotIndex: number, staticId: string, count: number) {
+  return {
+    slot_index: slotIndex,
+    count,
+    item: {
+      static_id: staticId,
+      dynamic_id: { created_world_id: ZERO_GUID, local_id_in_created_world: ZERO_GUID },
+    },
+    trailing_bytes: [] as number[],
+  }
+}
+
 /**
  * Add `count` of `staticId` to the container with GUID `guidHex`. Stacks onto an
- * existing slot of that item, else fills an empty ("None") slot in place. Throws
- * if the container isn't found or is full. Returns the mutated levelJson.
+ * existing slot of that item, else fills a free slot. A slot counts as free when
+ * it holds a decoded "None" item OR when its RawData is empty bytes (decoded to
+ * `null`) — post-"memory optimisation" saves store never-used slots the latter
+ * way, so those must be recognised too or a half-empty container looks full.
+ * Throws if the container isn't found or is genuinely full.
  */
 export function addItemToContainer(
   levelJson: unknown,
@@ -137,11 +155,19 @@ export function addItemToContainer(
       return
     }
   }
-  for (const slot of slots) {
+  for (let i = 0; i < slots.length; i++) {
+    const slot = slots[i]
+    const rawData = dig(slot, 'RawData') as Record<string, unknown> | undefined
+    if (!rawData || typeof rawData !== 'object') continue
     const raw = slotRaw(slot)
     if (raw && raw.item.static_id === 'None') {
       raw.item.static_id = staticId
       raw.count = count
+      return
+    }
+    if (rawData.value == null) {
+      const idx = dig(slot, 'SlotIndex', 'value')
+      rawData.value = packedSlot(typeof idx === 'number' ? idx : i, staticId, count)
       return
     }
   }
