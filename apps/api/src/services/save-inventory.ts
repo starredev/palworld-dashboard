@@ -114,8 +114,8 @@ function slotRaw(slot: unknown): SlotRaw | null {
     : null
 }
 
-/** A fresh packed slot value (matches item_container_slots.py encode_bytes). */
-function packedSlot(slotIndex: number, staticId: string, count: number) {
+/** A decoded slot value for a stackable item (matches encode_bytes' fields). */
+function packedValue(slotIndex: number, staticId: string, count: number, trailingLen: number) {
   return {
     slot_index: slotIndex,
     count,
@@ -123,16 +123,36 @@ function packedSlot(slotIndex: number, staticId: string, count: number) {
       static_id: staticId,
       dynamic_id: { created_world_id: ZERO_GUID, local_id_in_created_world: ZERO_GUID },
     },
-    trailing_bytes: [] as number[],
+    trailing_bytes: new Array(Math.max(0, trailingLen)).fill(0) as number[],
   }
 }
 
+/** Any occupied slot in the level, to clone as a structural template for a new
+ *  slot (carries the exact RawData/CustomVersionData property shape to re-encode).
+ *  Prefers the target container's own slots; falls back to any other container. */
+function anySlotTemplate(levelJson: unknown, preferred: unknown[]): unknown {
+  if (preferred.length) return preferred[0]
+  const entries = dig(deepFind(levelJson, 'ItemContainerSaveData'), 'value')
+  if (Array.isArray(entries)) {
+    for (const e of entries) {
+      const s = dig(e, 'value', 'Slots', 'value', 'values')
+      if (Array.isArray(s) && s.length) return s[0]
+    }
+  }
+  return null
+}
+
 /**
- * Add `count` of `staticId` to the container with GUID `guidHex`. Stacks onto an
- * existing slot of that item, else fills a free slot. A slot counts as free when
- * it holds a decoded "None" item OR when its RawData is empty bytes (decoded to
- * `null`) — post-"memory optimisation" saves store never-used slots the latter
- * way, so those must be recognised too or a half-empty container looks full.
+ * Add `count` of `staticId` to the container with GUID `guidHex`.
+ *
+ * 1. Stacks onto an existing slot of that item.
+ * 2. Fills a placeholder empty slot in place if the save stores any (a decoded
+ *    "None" item, or empty/null RawData) — older save formats.
+ * 3. Otherwise appends a NEW slot at a free index. Post-"memory optimisation"
+ *    saves store ONLY occupied slots, so free space shows up as `Slots` being
+ *    shorter than the container's `SlotNum` (capacity) — there are no empty slots
+ *    to fill, so a new one must be cloned from an existing slot and appended.
+ *
  * Throws if the container isn't found or is genuinely full.
  */
 export function addItemToContainer(
@@ -167,8 +187,38 @@ export function addItemToContainer(
     }
     if (rawData.value == null) {
       const idx = dig(slot, 'SlotIndex', 'value')
-      rawData.value = packedSlot(typeof idx === 'number' ? idx : i, staticId, count)
+      rawData.value = packedValue(typeof idx === 'number' ? idx : i, staticId, count, 0)
       return
+    }
+  }
+
+  // Append into spare capacity. Only possible when SlotNum (capacity) is known;
+  // pick the lowest slot index not already taken.
+  const slotNum = dig(entry, 'value', 'SlotNum', 'value')
+  if (typeof slotNum === 'number') {
+    const used = new Set(
+      slots
+        .map((s) => dig(s, 'RawData', 'value', 'slot_index'))
+        .filter((n): n is number => typeof n === 'number'),
+    )
+    let free = -1
+    for (let i = 0; i < slotNum; i++)
+      if (!used.has(i)) {
+        free = i
+        break
+      }
+    if (free >= 0) {
+      // Deep-clone an existing slot (whole struct incl. CustomVersionData) so the
+      // new slot re-encodes with the right property shape, then set its payload.
+      const template = anySlotTemplate(levelJson, slots)
+      const clone: unknown = template ? JSON.parse(JSON.stringify(template)) : null
+      const rawData = dig(clone, 'RawData') as Record<string, unknown> | undefined
+      if (clone && rawData && typeof rawData === 'object') {
+        const prev = dig(rawData, 'value', 'trailing_bytes')
+        rawData.value = packedValue(free, staticId, count, Array.isArray(prev) ? prev.length : 0)
+        slots.push(clone)
+        return
+      }
     }
   }
   throw new Error('Inventory is full (no free slot)')
