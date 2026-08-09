@@ -345,6 +345,13 @@ const transferItemOp = {
   label: z.string(),
   item: giveItemInputSchema,
 }
+// Delete items from a player's inventory.
+const removeItemOp = {
+  type: z.literal('removeItem'),
+  uid: z.string(),
+  label: z.string(),
+  item: giveItemInputSchema,
+}
 // Guild ops target a guild (group_id) rather than a player uid.
 const guildRenameOp = {
   type: z.literal('guildRename'),
@@ -391,6 +398,7 @@ export const saveOpInputSchema = z.discriminatedUnion('type', [
   z.object(palCopyOp),
   z.object(giveOp),
   z.object(transferItemOp),
+  z.object(removeItemOp),
   z.object(guildRenameOp),
   z.object(guildLeaderOp),
   z.object(guildKickOp),
@@ -410,6 +418,7 @@ export const saveOpSchema = z.discriminatedUnion('type', [
   z.object({ ...palCopyOp, id: z.string() }),
   z.object({ ...giveOp, id: z.string() }),
   z.object({ ...transferItemOp, id: z.string() }),
+  z.object({ ...removeItemOp, id: z.string() }),
   z.object({ ...guildRenameOp, id: z.string() }),
   z.object({ ...guildLeaderOp, id: z.string() }),
   z.object({ ...guildKickOp, id: z.string() }),

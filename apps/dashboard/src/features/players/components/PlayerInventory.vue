@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
-import { Loader2, Backpack, Layers, ArrowLeftRight } from 'lucide-vue-next'
+import { Loader2, Backpack, Layers, ArrowLeftRight, Trash2 } from 'lucide-vue-next'
 import { Button, Input } from '@tsuki/ui'
 import type { InventoryResponse } from '@tsuki/types'
 import { api } from '@/lib/api'
@@ -180,6 +180,17 @@ function queueTransfer(): void {
     },
   )
 }
+
+// ---- Delete an item stack ----
+function queueRemove(item: { id: string; count: number }): void {
+  if (!props.uid) return
+  queue.mutate({
+    type: 'removeItem',
+    uid: props.uid,
+    label: `Remove ${item.count}× ${label(item.id)}`,
+    item: { staticId: item.id, count: item.count },
+  })
+}
 </script>
 
 <template>
@@ -223,6 +234,16 @@ function queueTransfer(): void {
             />
             <span class="min-w-0 flex-1 truncate" :title="item.id">{{ label(item.id) }}</span>
             <span class="shrink-0 font-medium text-muted-foreground">×{{ item.count }}</span>
+            <button
+              v-if="canEdit"
+              type="button"
+              class="shrink-0 text-muted-foreground/60 transition-colors hover:text-red-400 disabled:opacity-40"
+              :title="`Delete ${label(item.id)}`"
+              :disabled="queue.isPending.value"
+              @click="queueRemove(item)"
+            >
+              <Trash2 class="size-3.5" />
+            </button>
           </div>
         </div>
       </div>
