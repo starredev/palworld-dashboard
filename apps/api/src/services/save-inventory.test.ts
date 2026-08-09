@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { addItemToContainer } from './save-inventory'
+import {
+  addItemToContainer,
+  removeItemFromContainers,
+  transferItemMutate,
+} from './save-inventory'
 
 const GUID = 'aaaa1111-0000-0000-0000-000000000000'
 const ZERO = '00000000-0000-0000-0000-000000000000'
@@ -129,5 +133,95 @@ describe('addItemToContainer', () => {
   it('throws when the container GUID is not found', () => {
     const json = levelJson([slot('None', 0)])
     expect(() => addItemToContainer(json, 'deadbeef', 'Wood', 1)).toThrow(/not found/i)
+  })
+})
+
+const hex = (g: string) => g.replace(/-/g, '')
+
+describe('removeItemFromContainers', () => {
+  it('decrements a stack and leaves the slot occupied when some remain', () => {
+    const json = levelJson([slot('Wood', 50)])
+    removeItemFromContainers(json, [hex(GUID)], 'Wood', 20)
+    expect(slotsOf(json)[0].RawData.value?.count).toBe(30)
+    expect(slotsOf(json)[0].RawData.value?.item.static_id).toBe('Wood')
+  })
+
+  it('empties a slot (None, 0) when the whole stack is removed', () => {
+    const json = levelJson([slot('Wood', 20)])
+    removeItemFromContainers(json, [hex(GUID)], 'Wood', 20)
+    const raw = slotsOf(json)[0].RawData.value
+    expect(raw?.count).toBe(0)
+    expect(raw?.item.static_id).toBe('None')
+  })
+
+  it('draws from multiple slots of the same item across the container', () => {
+    const json = levelJson([slot('Arrow', 30, 0), slot('Arrow', 30, 1)])
+    removeItemFromContainers(json, [hex(GUID)], 'Arrow', 45)
+    const [a, b] = slotsOf(json)
+    expect(a.RawData.value?.item.static_id).toBe('None')
+    expect(a.RawData.value?.count).toBe(0)
+    expect(b.RawData.value?.count).toBe(15)
+  })
+
+  it('throws (without mutating) when the player has too few', () => {
+    const json = levelJson([slot('Wood', 5)])
+    expect(() => removeItemFromContainers(json, [hex(GUID)], 'Wood', 10)).toThrow(/not enough/i)
+    expect(slotsOf(json)[0].RawData.value?.count).toBe(5)
+  })
+})
+
+describe('transferItemMutate', () => {
+  const SRC = 'aaaa1111-0000-0000-0000-000000000000'
+  const DST = 'bbbb2222-0000-0000-0000-000000000000'
+
+  // Two containers in one Level.sav: source (SRC) and target (DST).
+  function twoContainers(srcSlots: unknown[], dstSlots: unknown[], dstSlotNum?: number) {
+    return {
+      properties: {
+        worldSaveData: {
+          value: {
+            ItemContainerSaveData: {
+              value: [
+                { key: { ID: { value: SRC } }, value: { Slots: { value: { values: srcSlots } } } },
+                {
+                  key: { ID: { value: DST } },
+                  value: {
+                    ...(dstSlotNum !== undefined ? { SlotNum: { value: dstSlotNum } } : {}),
+                    Slots: { value: { values: dstSlots } },
+                  },
+                },
+              ],
+            },
+          },
+        },
+      },
+    }
+  }
+  const slotsAt = (json: unknown, i: number) =>
+    (json as ReturnType<typeof twoContainers>).properties.worldSaveData.value.ItemContainerSaveData
+      .value[i].value.Slots.value.values as {
+      RawData: { value: { count: number; item: { static_id: string } } | null }
+    }[]
+
+  it('moves items out of the source and into the target (stacking)', () => {
+    const json = twoContainers([slot('Wood', 50)], [slot('Wood', 10)])
+    transferItemMutate(json, [hex(SRC)], hex(DST), 'Wood', 30)
+    expect(slotsAt(json, 0)[0].RawData.value?.count).toBe(20) // source drained
+    expect(slotsAt(json, 1)[0].RawData.value?.count).toBe(40) // target gained
+  })
+
+  it('appends a new target slot when the item is new to the target', () => {
+    const json = twoContainers([slot('PalSphere', 32)], [slot('Wood', 1, 0)], 10)
+    transferItemMutate(json, [hex(SRC)], hex(DST), 'PalSphere', 32)
+    expect(slotsAt(json, 0)[0].RawData.value?.item.static_id).toBe('None') // fully moved
+    const dst = slotsAt(json, 1)
+    expect(dst).toHaveLength(2)
+    expect(dst[1].RawData.value).toMatchObject({ count: 32, item: { static_id: 'PalSphere' } })
+  })
+
+  it('does not touch the target when the source lacks enough', () => {
+    const json = twoContainers([slot('Wood', 5)], [slot('Wood', 10)])
+    expect(() => transferItemMutate(json, [hex(SRC)], hex(DST), 'Wood', 20)).toThrow(/not enough/i)
+    expect(slotsAt(json, 1)[0].RawData.value?.count).toBe(10) // target unchanged
   })
 })

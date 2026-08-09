@@ -31,6 +31,8 @@ import {
   commonContainerGuid,
   isInventoryAvailable,
   palBoxContainerGuid,
+  playerContainerGuids,
+  transferItemMutate,
 } from './save-inventory'
 import { kickGuildMemberMutate, renameGuildMutate, setGuildLeaderMutate } from './save-guild'
 import { isChestsAvailable, unlockChestMutate } from './save-chests'
@@ -81,6 +83,7 @@ function applyLevelOp(
   op: SaveOp,
   guids: Record<string, string>,
   boxGuids: Record<string, string>,
+  srcGuids: Record<string, string[]>,
 ): void {
   if (op.type === 'palClone') return clonePalMutate(json, op.uid, op.instanceId)
   if (op.type === 'palCopy') {
@@ -92,6 +95,12 @@ function applyLevelOp(
     const g = guids[op.uid]
     if (!g) throw new Error('Inventory container not found')
     return addItemToContainer(json, g, op.item.staticId, op.item.count)
+  }
+  if (op.type === 'transferItem') {
+    const from = srcGuids[op.fromUid]
+    const to = guids[op.toUid]
+    if (!from || !to) throw new Error('Inventory container not found')
+    return transferItemMutate(json, from, to, op.item.staticId, op.item.count)
   }
   if (op.type === 'palEdit') {
     const p = findPalRef(json, op.uid, op.instanceId)
@@ -166,15 +175,22 @@ export async function applyBatch(app: FastifyInstance): Promise<BatchApplyResult
 
     // --- Level.sav edits (one shared decode/re-encode) ---
     if (levelOps.length) {
-      const needItems = levelOps.some((o) => o.type === 'giveItem')
+      const needItems = levelOps.some((o) => o.type === 'giveItem' || o.type === 'transferItem')
       const needChests = levelOps.some((o) => o.type === 'chestUnlock')
       if (needChests && !isChestsAvailable()) throw new Error('Chest editing is not available')
+      // guids = target/common container per player; srcGuids = all of a source
+      // player's containers (a transfer pulls the item from wherever it sits).
       const guids: Record<string, string> = {}
+      const srcGuids: Record<string, string[]> = {}
       if (needItems) {
         if (!isInventoryAvailable()) throw new Error('Inventory editing is not available')
         for (const o of levelOps) {
           if (o.type === 'giveItem' && !guids[o.uid])
             guids[o.uid] = await commonContainerGuid(o.uid)
+          if (o.type === 'transferItem') {
+            if (!srcGuids[o.fromUid]) srcGuids[o.fromUid] = await playerContainerGuids(o.fromUid)
+            if (!guids[o.toUid]) guids[o.toUid] = await commonContainerGuid(o.toUid)
+          }
         }
       }
       // pal-copy needs each target's Pal Box container guid (from their player file).
@@ -207,7 +223,7 @@ export async function applyBatch(app: FastifyInstance): Promise<BatchApplyResult
         const json = JSON.parse(await readFile(jsonPath, 'utf8'))
         for (const o of levelOps) {
           try {
-            applyLevelOp(json, o, guids, boxGuids)
+            applyLevelOp(json, o, guids, boxGuids, srcGuids)
             applied++
           } catch (e) {
             failed.push({ label: o.label, error: (e as Error).message })

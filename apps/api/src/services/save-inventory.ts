@@ -225,6 +225,64 @@ export function addItemToContainer(
 }
 
 /**
+ * Remove `count` of `staticId` spread across the given containers (by GUID).
+ * Sums the item across every matching slot first and throws if the player
+ * doesn't have enough — so nothing is mutated on a shortfall. Otherwise it
+ * decrements slots in order, emptying a slot ("None", 0) once it hits zero.
+ */
+export function removeItemFromContainers(
+  levelJson: unknown,
+  guidHexes: string[],
+  staticId: string,
+  count: number,
+): void {
+  const entries = dig(deepFind(levelJson, 'ItemContainerSaveData'), 'value')
+  if (!Array.isArray(entries)) throw new Error('Inventory container not found')
+  const wanted = new Set(guidHexes)
+  const matching: SlotRaw[] = []
+  for (const entry of entries) {
+    if (!wanted.has(hex(dig(entry, 'key', 'ID', 'value')))) continue
+    const slots = dig(entry, 'value', 'Slots', 'value', 'values')
+    if (!Array.isArray(slots)) continue
+    for (const slot of slots) {
+      const raw = slotRaw(slot)
+      if (raw && raw.item.static_id === staticId) matching.push(raw)
+    }
+  }
+  const total = matching.reduce((n, r) => n + r.count, 0)
+  if (total < count) {
+    throw new Error(`Not enough of that item to transfer (have ${total}, need ${count})`)
+  }
+  let remaining = count
+  for (const raw of matching) {
+    if (remaining <= 0) break
+    const take = Math.min(raw.count, remaining)
+    raw.count -= take
+    remaining -= take
+    if (raw.count <= 0) {
+      raw.item.static_id = 'None'
+      raw.count = 0
+    }
+  }
+}
+
+/**
+ * Move `count` of `staticId` from a source player's containers into a target
+ * container (their main inventory). Removal is validated up front, so a
+ * shortfall throws before the target is touched.
+ */
+export function transferItemMutate(
+  levelJson: unknown,
+  fromGuids: string[],
+  toGuid: string,
+  staticId: string,
+  count: number,
+): void {
+  removeItemFromContainers(levelJson, fromGuids, staticId, count)
+  addItemToContainer(levelJson, toGuid, staticId, count)
+}
+
+/**
  * Edit Level.sav with the item-slot decoder/encoder ENABLED (so item slots can
  * be changed), through the safe pipeline: stop → backup → decode → mutate →
  * re-encode → start. Only for item writes; other writes leave slots raw.
@@ -271,6 +329,20 @@ export async function commonContainerGuid(uid: string): Promise<string> {
   const guid = hex(dig(inv, 'value', 'CommonContainerId', 'value', 'ID', 'value'))
   if (!guid) throw new Error('Could not resolve the player inventory container')
   return guid
+}
+
+/** All of a player's inventory container guids (bag/key items/weapons/armor/food). */
+export async function playerContainerGuids(uid: string): Promise<string[]> {
+  const path = playerSavePath(uid)
+  if (!existsSync(path)) throw new Error('Player save not found')
+  const inv = deepFind(await readSaveJson(path), 'InventoryInfo')
+  const guids: string[] = []
+  for (const [key] of CONTAINERS) {
+    const g = hex(dig(inv, 'value', key, 'value', 'ID', 'value'))
+    if (g) guids.push(g)
+  }
+  if (!guids.length) throw new Error('Could not resolve the player inventory containers')
+  return guids
 }
 
 /** A player's Pal Box (deposit storage) container guid, from their player file. */

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { Loader2, Backpack, Layers } from 'lucide-vue-next'
+import { useQuery } from '@tanstack/vue-query'
+import { Loader2, Backpack, Layers, ArrowLeftRight } from 'lucide-vue-next'
 import { Button, Input } from '@tsuki/ui'
 import type { InventoryResponse } from '@tsuki/types'
 import { api } from '@/lib/api'
@@ -119,6 +120,59 @@ function queueGive(): void {
     },
   )
 }
+
+// ---- Transfer an owned item to another player ----
+const savePlayers = useQuery({
+  queryKey: ['savePlayers'],
+  queryFn: () => api.getSavePlayers(),
+  staleTime: 60_000,
+  enabled: computed(() => !!props.canEdit),
+})
+const transferTargets = computed(() =>
+  (savePlayers.data.value?.players ?? []).filter((p) => p.uid !== props.uid),
+)
+
+// The player's current items (summed across all containers) — the transfer source.
+const ownedItems = computed(() => {
+  const totals = new Map<string, number>()
+  for (const c of data.value?.containers ?? [])
+    for (const it of c.items) totals.set(it.id, (totals.get(it.id) ?? 0) + it.count)
+  return [...totals.entries()]
+    .map(([id, count]) => ({ id, count, n: label(id) }))
+    .sort((a, b) => a.n.localeCompare(b.n))
+})
+
+const xferItemId = ref('')
+const xferCount = ref(1)
+const xferTarget = ref('')
+const xferMax = computed(() => ownedItems.value.find((i) => i.id === xferItemId.value)?.count ?? 1)
+// Keep the count within what the player actually owns of the picked item.
+watch([xferItemId, ownedItems], () => {
+  if (xferCount.value > xferMax.value) xferCount.value = xferMax.value
+})
+
+function queueTransfer(): void {
+  const src = ownedItems.value.find((i) => i.id === xferItemId.value)
+  const to = transferTargets.value.find((p) => p.uid === xferTarget.value)
+  if (!props.uid || !src || !to) return
+  const count = Math.min(Math.max(1, xferCount.value), src.count)
+  queue.mutate(
+    {
+      type: 'transferItem',
+      fromUid: props.uid,
+      toUid: to.uid,
+      label: `Transfer ${count}× ${src.n} → ${to.name ?? to.uid.slice(0, 8)}`,
+      item: { staticId: src.id, count },
+    },
+    {
+      onSuccess: () => {
+        xferItemId.value = ''
+        xferCount.value = 1
+        xferTarget.value = ''
+      },
+    },
+  )
+}
 </script>
 
 <template>
@@ -213,6 +267,40 @@ function queueGive(): void {
         <p v-if="queue.isError.value" class="mt-2 text-xs text-red-400">
           {{ (queue.error.value as Error)?.message ?? 'Failed to queue.' }}
         </p>
+      </div>
+
+      <!-- Transfer to another player (admin) -->
+      <div v-if="canEdit && ownedItems.length" class="mt-4 border-t border-border pt-3">
+        <p class="mb-1.5 text-xs font-medium text-muted-foreground">Transfer to another player</p>
+        <div class="flex flex-wrap items-center gap-2">
+          <select
+            v-model="xferItemId"
+            class="h-9 min-w-[10rem] flex-1 rounded-lg border border-border bg-background px-2 text-xs outline-none focus:ring-2 focus:ring-ring"
+          >
+            <option value="">Pick an item…</option>
+            <option v-for="it in ownedItems" :key="it.id" :value="it.id">
+              {{ it.n }} — ×{{ it.count }}
+            </option>
+          </select>
+          <Input v-model.number="xferCount" type="number" min="1" :max="xferMax" class="w-20" />
+          <select
+            v-model="xferTarget"
+            class="h-9 min-w-[9rem] flex-1 rounded-lg border border-border bg-background px-2 text-xs outline-none focus:ring-2 focus:ring-ring"
+          >
+            <option value="">To player…</option>
+            <option v-for="p in transferTargets" :key="p.uid" :value="p.uid">
+              {{ p.name ?? p.uid.slice(0, 8) }}
+            </option>
+          </select>
+          <Button
+            variant="outline"
+            size="sm"
+            :disabled="!xferItemId || !xferTarget || queue.isPending.value"
+            @click="queueTransfer"
+          >
+            <ArrowLeftRight /> Add to batch
+          </Button>
+        </div>
       </div>
     </template>
   </div>
