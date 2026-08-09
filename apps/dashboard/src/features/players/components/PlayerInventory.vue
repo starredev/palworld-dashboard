@@ -87,12 +87,19 @@ const showList = ref(false)
 const giveMatches = computed(() => {
   const q = giveSearch.value.trim().toLowerCase()
   if (q.length < 2) return []
-  const out: { id: string; n: string }[] = []
+  // Rank matches so an exact name wins, then a prefix, then any substring —
+  // otherwise a search like "plasteel" is buried under armor/schematic variants
+  // and the plain material never makes the (capped) list.
+  const scored: { id: string; n: string; rank: number }[] = []
   for (const [id, m] of Object.entries(items.value)) {
-    if (m.n.toLowerCase().includes(q)) out.push({ id, n: m.n })
-    if (out.length >= 12) break
+    const name = m.n.toLowerCase()
+    const idx = name.indexOf(q)
+    if (idx === -1) continue
+    const tier = name === q ? 0 : idx === 0 ? 1 : 2
+    scored.push({ id, n: m.n, rank: tier * 10_000 + name.length })
   }
-  return out
+  scored.sort((a, b) => a.rank - b.rank)
+  return scored.slice(0, 12).map(({ id, n }) => ({ id, n }))
 })
 function pickGive(m: { id: string; n: string }): void {
   givePicked.value = m

@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  addItemToContainer,
-  removeItemFromContainers,
-  transferItemMutate,
-} from './save-inventory'
+import { addItemToContainer, removeItemFromContainers, transferItemMutate } from './save-inventory'
 
 const GUID = 'aaaa1111-0000-0000-0000-000000000000'
 const ZERO = '00000000-0000-0000-0000-000000000000'
