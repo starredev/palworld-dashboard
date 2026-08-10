@@ -95,6 +95,12 @@ pnpm --filter @tsuki/docs docs:dev     # live preview
 pnpm --filter @tsuki/docs docs:build   # build static site → docs/.vitepress/dist
 ```
 
+Host it alongside the panel with the docs overlay (serves on `DOCS_PORT`, default `8081`):
+
+```bash
+docker compose -f compose.yml -f compose.docs.yml up -d --build
+```
+
 ## Getting started
 
 Requires **Node ≥ 20.19** and **pnpm 10**.

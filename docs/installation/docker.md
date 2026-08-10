@@ -77,3 +77,40 @@ Set `COMPOSE_FILE=compose.yml:compose.palworld.yml` in your `.env`, then plain `
 :::
 
 See **[Managing the deployment](/reference/operations)** for logs, status and more.
+
+## Hosting this documentation
+
+This docs site can run as its own container next to the panel, via the `compose.docs.yml` overlay:
+
+```bash
+docker compose -f compose.yml -f compose.docs.yml up -d --build
+```
+
+It publishes on `DOCS_PORT` (default `8081`). Point a subdomain at it with your reverse proxy — for example an nginx server block:
+
+```nginx
+server {
+    server_name docs.example.com;
+    location / {
+        proxy_pass http://127.0.0.1:8081;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+    # add TLS (certbot / your proxy of choice)
+}
+```
+
+Caddy is even shorter:
+
+```text
+docs.example.com {
+    reverse_proxy localhost:8081
+}
+```
+
+Combine all overlays you use in one command (or set `COMPOSE_FILE` in `.env`):
+
+```bash
+docker compose -f compose.yml -f compose.palworld.yml -f compose.docs.yml up -d --build
+```
