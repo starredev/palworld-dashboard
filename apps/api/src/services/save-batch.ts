@@ -11,7 +11,7 @@ import { loadEnv } from '../config/env'
 import { createBackup } from './backups'
 import { startContainer, stopContainer } from './container-control'
 import { isSaveEditAvailable } from './save-edit'
-import { jsonToSav, savToJson } from './save-editor'
+import { jsonToSav, parseSaveJson, savToJson, stringifySaveJson } from './save-editor'
 import { setLocation } from './save-location'
 import { setTechPoints } from './save-player-fields'
 import { playerSavePath } from './save-teleport'
@@ -160,7 +160,7 @@ export async function applyBatch(app: FastifyInstance): Promise<BatchApplyResult
       let jsonPath: string | null = null
       try {
         jsonPath = await savToJson(playerSavePath(uid))
-        const json = JSON.parse(await readFile(jsonPath, 'utf8'))
+        const json = parseSaveJson(await readFile(jsonPath, 'utf8'))
         for (const o of uidOps) {
           try {
             if (o.type === 'teleport') setLocation(json, o.coords)
@@ -170,7 +170,7 @@ export async function applyBatch(app: FastifyInstance): Promise<BatchApplyResult
             failed.push({ label: o.label, error: (e as Error).message })
           }
         }
-        await writeFile(jsonPath, JSON.stringify(json))
+        await writeFile(jsonPath, stringifySaveJson(json))
         await jsonToSav(jsonPath)
       } catch (e) {
         for (const o of uidOps) failed.push({ label: o.label, error: (e as Error).message })
@@ -230,7 +230,7 @@ export async function applyBatch(app: FastifyInstance): Promise<BatchApplyResult
         jsonPath = await savToJson(sav)
       }
       try {
-        const json = JSON.parse(await readFile(jsonPath, 'utf8'))
+        const json = parseSaveJson(await readFile(jsonPath, 'utf8'))
         for (const o of levelOps) {
           try {
             applyLevelOp(json, o, guids, boxGuids, srcGuids)
@@ -239,7 +239,7 @@ export async function applyBatch(app: FastifyInstance): Promise<BatchApplyResult
             failed.push({ label: o.label, error: (e as Error).message })
           }
         }
-        await writeFile(jsonPath, JSON.stringify(json))
+        await writeFile(jsonPath, stringifySaveJson(json))
         await jsonToSav(jsonPath)
       } finally {
         if (existsSync(jsonPath)) rmSync(jsonPath)

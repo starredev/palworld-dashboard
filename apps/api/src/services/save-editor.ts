@@ -51,6 +51,35 @@ export function jsonToSav(jsonPath: string): Promise<string> {
   return convert(jsonPath, jsonPath.slice(0, -JSON_SUFFIX.length), '--from-json')
 }
 
+// Python's json module emits BARE `NaN` / `Infinity` / `-Infinity` for the
+// non-finite floats some save fields hold (e.g. a rate that divides by zero).
+// Those tokens are invalid JSON, so Node's JSON.parse rejects the whole file.
+// Swap them for a sentinel string on the way in and restore the bare tokens on
+// the way out — Python's json.loads accepts them, so the value round-trips
+// unchanged through a re-encode without us ever having to interpret it.
+const NON_FINITE: [token: string, quotedSentinel: string][] = [
+  ['-Infinity', '"@@TSUKI_NEG_INF@@"'],
+  ['Infinity', '"@@TSUKI_INF@@"'],
+  ['NaN', '"@@TSUKI_NAN@@"'],
+]
+
+/** JSON.parse that tolerates the converter's bare NaN/Infinity tokens. */
+export function parseSaveJson<T = unknown>(text: string): T {
+  // -Infinity before Infinity so the shared "Infinity" tail isn't half-replaced.
+  const safe = text
+    .replace(/-Infinity/g, NON_FINITE[0][1])
+    .replace(/\bInfinity\b/g, NON_FINITE[1][1])
+    .replace(/\bNaN\b/g, NON_FINITE[2][1])
+  return JSON.parse(safe) as T
+}
+
+/** JSON.stringify that restores bare NaN/Infinity tokens for Python to re-read. */
+export function stringifySaveJson(value: unknown): string {
+  let out = JSON.stringify(value)
+  for (const [token, sentinel] of NON_FINITE) out = out.split(sentinel).join(token)
+  return out
+}
+
 /**
  * Convert a save file to JSON, parse it, then delete the temp JSON. Read-only:
  * used to inspect save structure (e.g. to locate player positions) without ever
@@ -59,7 +88,7 @@ export function jsonToSav(jsonPath: string): Promise<string> {
 export async function readSaveJson<T = unknown>(savPath: string): Promise<T> {
   const jsonPath = await savToJson(savPath)
   try {
-    return JSON.parse(await readFile(jsonPath, 'utf8')) as T
+    return parseSaveJson<T>(await readFile(jsonPath, 'utf8'))
   } finally {
     if (existsSync(jsonPath)) rmSync(jsonPath)
   }

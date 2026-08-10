@@ -9,7 +9,13 @@ import { loadEnv } from '../config/env'
 import { createBackup } from './backups'
 import { startContainer, stopContainer } from './container-control'
 import { isSaveEditAvailable } from './save-edit'
-import { isSaveEditorAvailable, jsonToSav, readSaveJson } from './save-editor'
+import {
+  isSaveEditorAvailable,
+  jsonToSav,
+  parseSaveJson,
+  readSaveJson,
+  stringifySaveJson,
+} from './save-editor'
 import { deepFind } from './save-location'
 import { findWorldSaveDir, playerSavePath } from './save-teleport'
 
@@ -58,7 +64,7 @@ async function readLevelWithItems(): Promise<unknown> {
     maxBuffer: 256 * 1024 * 1024,
   })
   try {
-    return JSON.parse(await readFile(out, 'utf8'))
+    return parseSaveJson(await readFile(out, 'utf8'))
   } finally {
     if (existsSync(out)) rmSync(out)
   }
@@ -308,9 +314,9 @@ async function editLevelWithItems(
       maxBuffer: 256 * 1024 * 1024,
     })
     try {
-      const json = JSON.parse(await readFile(jsonPath, 'utf8'))
+      const json = parseSaveJson(await readFile(jsonPath, 'utf8'))
       mutate(json)
-      await writeFile(jsonPath, JSON.stringify(json))
+      await writeFile(jsonPath, stringifySaveJson(json))
       await jsonToSav(jsonPath) // default convert re-encodes decoded slots via our encode
     } finally {
       if (existsSync(jsonPath)) rmSync(jsonPath)
