@@ -20,6 +20,10 @@ RUN --mount=type=cache,id=pnpm,target=/root/.local/share/pnpm/store \
 
 # ---- Build the static docs site ----
 FROM deps AS build
+# VitePress `lastUpdated` shells out to git; without it the build errors with
+# `spawn git ENOENT`. (No .git is copied here, so timestamps are simply omitted
+# in the container build — local builds with a repo still show them.)
+RUN apk add --no-cache git
 COPY docs ./docs
 RUN pnpm --filter @tsuki/docs docs:build
 
