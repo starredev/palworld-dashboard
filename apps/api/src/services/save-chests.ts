@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { promisify } from 'node:util'
 import type { LockedChest } from '@tsuki/types'
 import { loadEnv } from '../config/env'
-import { isSaveEditorAvailable } from './save-editor'
+import { isSaveEditorAvailable, parseSaveJson, tempJsonPath } from './save-editor'
 import { deepFind } from './save-location'
 import { findWorldSaveDir } from './save-teleport'
 
@@ -38,14 +38,14 @@ export function isChestsAvailable(): boolean {
 /** Decode Level.sav with ALL custom decoders enabled (map objects included). */
 async function readLevelFull(): Promise<unknown> {
   const env = loadEnv()
-  const out = `${levelSavPath()}.full.json`
-  if (existsSync(out)) rmSync(out)
+  // Unique output so concurrent full-decode reads don't clobber each other.
+  const out = tempJsonPath(levelSavPath(), 'full')
   await run(env.PYTHON_BIN, [convertFullScript(), levelSavPath(), out], {
     cwd: env.SAVE_TOOLS_DIR,
     maxBuffer: 256 * 1024 * 1024,
   })
   try {
-    return JSON.parse(await readFile(out, 'utf8'))
+    return parseSaveJson(await readFile(out, 'utf8'))
   } finally {
     if (existsSync(out)) rmSync(out)
   }

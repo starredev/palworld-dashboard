@@ -2,6 +2,7 @@ import { execFile } from 'node:child_process'
 import { existsSync, rmSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { randomUUID } from 'node:crypto'
 import { promisify } from 'node:util'
 import { loadEnv } from '../config/env'
 
@@ -45,6 +46,16 @@ export function savToJson(savPath: string): Promise<string> {
   return convert(savPath, `${savPath}${JSON_SUFFIX}`, '--to-json')
 }
 
+/**
+ * A unique temp JSON path beside a save file, e.g. `Level.sav.inv.<uuid>.json`.
+ * Read paths MUST use a unique output per call — several requests decode the
+ * same Level.sav concurrently, and a fixed name lets one request's cleanup
+ * delete another's output mid-read ("Conversion produced no output").
+ */
+export function tempJsonPath(savPath: string, tag: string): string {
+  return `${savPath}.${tag}.${randomUUID()}${JSON_SUFFIX}`
+}
+
 /** Convert a `<name>.sav.json` back to `<name>.sav`; returns the sav path. */
 export function jsonToSav(jsonPath: string): Promise<string> {
   if (!jsonPath.endsWith(JSON_SUFFIX)) throw new Error('Expected a .json path')
@@ -86,7 +97,9 @@ export function stringifySaveJson(value: unknown): string {
  * touching the original `.sav`.
  */
 export async function readSaveJson<T = unknown>(savPath: string): Promise<T> {
-  const jsonPath = await savToJson(savPath)
+  // Unique output so concurrent reads of the same save never clobber each other.
+  const jsonPath = tempJsonPath(savPath, 'read')
+  await convert(savPath, jsonPath, '--to-json')
   try {
     return parseSaveJson<T>(await readFile(jsonPath, 'utf8'))
   } finally {

@@ -15,6 +15,7 @@ import {
   parseSaveJson,
   readSaveJson,
   stringifySaveJson,
+  tempJsonPath,
 } from './save-editor'
 import { deepFind } from './save-location'
 import { findWorldSaveDir, playerSavePath } from './save-teleport'
@@ -57,8 +58,8 @@ export function isInventoryAvailable(): boolean {
 /** Decode Level.sav with the item-slot decoder enabled (read-only, isolated). */
 async function readLevelWithItems(): Promise<unknown> {
   const env = loadEnv()
-  const out = `${levelSavPath()}.inv.json`
-  if (existsSync(out)) rmSync(out)
+  // Unique output: concurrent inventory reads must not share (and delete) a file.
+  const out = tempJsonPath(levelSavPath(), 'inv')
   await run(env.PYTHON_BIN, [convertScript(), levelSavPath(), out], {
     cwd: env.SAVE_TOOLS_DIR,
     maxBuffer: 256 * 1024 * 1024,
