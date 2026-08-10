@@ -86,6 +86,15 @@ packages/
 **Data flow:** `browser → apps/api → packages/sdk → Palworld`. The frontend only ever
 calls `apps/api`; it never touches RCON, the Palworld REST API, or server credentials directly.
 
+## Documentation
+
+Full documentation lives in [`docs/`](docs/) as a VitePress site — installation, per-feature guides, an environment-variable reference, and troubleshooting.
+
+```bash
+pnpm --filter @tsuki/docs docs:dev     # live preview
+pnpm --filter @tsuki/docs docs:build   # build static site → docs/.vitepress/dist
+```
+
 ## Getting started
 
 Requires **Node ≥ 20.19** and **pnpm 10**.
