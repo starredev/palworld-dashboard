@@ -7,7 +7,7 @@ import { api } from '@/lib/api'
 import { useSaveStatus } from '@/composables/use-save-editor'
 import { useAuthStore } from '@/stores/auth'
 import { usePalIcons } from '@/features/players/use-pal-icons'
-import { workDef } from '@/features/players/work'
+import { WORK_TYPES, workDef, useSpeciesWork } from '@/features/players/work'
 import PalEditDialog from '@/features/players/components/PalEditDialog.vue'
 import PagePlaceholder from '@/components/common/PagePlaceholder.vue'
 
@@ -78,7 +78,23 @@ const editing = ref<BoxPal | null>(null)
 function openPal(p: BoxPal): void {
   if (canEdit.value && p.instanceId) editing.value = p
 }
-const workTotal = (rank: number, add: number): number => Math.min(5, rank + add)
+
+// Work levels shown = species base (dex data — current saves don't store it)
+// + the save's condenser/book bonus.
+const speciesWork = useSpeciesWork()
+function workChips(p: BoxPal): { key: string; total: number; bonus: number }[] {
+  const base = { ...speciesWork.baseRanks(p.species) }
+  const bonus: Record<string, number> = {}
+  for (const s of p.workSuitabilities) {
+    if (s.rank > (base[s.type] ?? 0)) base[s.type] = s.rank
+    if (s.add > 0) bonus[s.type] = s.add
+  }
+  return WORK_TYPES.filter((t) => (base[t.key] ?? 0) + (bonus[t.key] ?? 0) > 0).map((t) => ({
+    key: t.key,
+    total: (base[t.key] ?? 0) + (bonus[t.key] ?? 0),
+    bonus: bonus[t.key] ?? 0,
+  }))
+}
 </script>
 
 <template>
@@ -189,16 +205,16 @@ const workTotal = (rank: number, add: number): number => Math.min(5, rank + add)
               </span>
             </span>
           </span>
-          <span v-if="p.workSuitabilities.length" class="flex flex-wrap gap-1">
+          <span v-if="workChips(p).length" class="flex flex-wrap gap-1">
             <span
-              v-for="w in p.workSuitabilities"
-              :key="w.type"
+              v-for="w in workChips(p)"
+              :key="w.key"
               class="inline-flex items-center gap-0.5 rounded bg-muted/50 px-1 py-0.5 text-[10px]"
-              :title="`${workDef(w.type)?.name ?? w.type} Lv ${workTotal(w.rank, w.add)}`"
+              :title="`${workDef(w.key)?.name ?? w.key} Lv ${w.total}`"
             >
-              {{ workDef(w.type)?.icon ?? '•' }}
-              <span class="tabular-nums" :class="w.add ? 'font-semibold text-primary' : ''">
-                {{ workTotal(w.rank, w.add) }}
+              {{ workDef(w.key)?.icon ?? '•' }}
+              <span class="tabular-nums" :class="w.bonus ? 'font-semibold text-primary' : ''">
+                {{ w.total }}
               </span>
             </span>
           </span>

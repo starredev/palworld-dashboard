@@ -105,12 +105,13 @@ export const palEditInputSchema = z
     /** Replace the pal's passive skills (internal ids). Max 4, deduped. */
     passives: z.array(z.string().min(1)).max(4).optional(),
     /**
-     * Desired TOTAL work-suitability level per short enum key (e.g.
-     * { Handcraft: 4 }). The backend writes the difference above the pal's
-     * base rank into GotWorkSuitabilityAddRankList (the condenser-bonus list),
-     * so a level can't drop below the species base.
+     * BONUS work-suitability ranks per short enum key (e.g. { Handcraft: 2 }),
+     * written verbatim into GotWorkSuitabilityAddRankList (the list the
+     * condenser/books use). The species base rank is not stored per pal in
+     * current saves, so the client computes bonus = desired total − species
+     * base (from the bundled dex data). 0 removes the bonus entry.
      */
-    workSuitability: z.record(z.string(), z.number().int().min(0).max(5)).optional(),
+    workSuitability: z.record(z.string(), z.number().int().min(0).max(10)).optional(),
   })
   .refine((v) => Object.values(v).some((x) => x !== undefined), {
     message: 'Nothing to change',

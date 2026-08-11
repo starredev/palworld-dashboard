@@ -568,7 +568,7 @@ describe('parseAllPals', () => {
 })
 
 describe('setWorkSuitability', () => {
-  it('writes the bonus above the species base into the add list; base list untouched', () => {
+  it('writes the bonus rank into the add list; CraftSpeeds (when present) untouched', () => {
     const params: Record<string, unknown> = {
       CraftSpeeds: workList('CraftSpeeds', [['Handcraft', 2]]),
     }
@@ -586,7 +586,7 @@ describe('setWorkSuitability', () => {
       Rank: { value: number }
     }
     expect(item.WorkSuitability.value.value).toBe('EPalWorkSuitability::Handcraft')
-    expect(item.Rank.value).toBe(2) // 4 total − 2 base
+    expect(item.Rank.value).toBe(4) // bonus written verbatim
     // Base CraftSpeeds rank is left alone (the game derives it from the species).
     const base = (params.CraftSpeeds as ReturnType<typeof workList>).value.values[0]
     expect(base.Rank.value).toBe(2)
@@ -594,30 +594,28 @@ describe('setWorkSuitability', () => {
 
   it('updates an existing bonus entry in place', () => {
     const params: Record<string, unknown> = {
-      CraftSpeeds: workList('CraftSpeeds', [['Handcraft', 1]]),
       GotWorkSuitabilityAddRankList: workList('GotWorkSuitabilityAddRankList', [['Handcraft', 1]]),
     }
-    setWorkSuitability(params, { Handcraft: 5 })
+    setWorkSuitability(params, { Handcraft: 4 })
     const vals = (params.GotWorkSuitabilityAddRankList as ReturnType<typeof workList>).value.values
     expect(vals).toHaveLength(1)
     expect(vals[0].Rank.value).toBe(4)
   })
 
-  it('removes the bonus entry when the target is at or below the base rank', () => {
+  it('removes the bonus entry when the bonus is 0', () => {
     const params: Record<string, unknown> = {
-      CraftSpeeds: workList('CraftSpeeds', [['Mining', 2]]),
       GotWorkSuitabilityAddRankList: workList('GotWorkSuitabilityAddRankList', [
         ['Mining', 2],
         ['Handcraft', 1],
       ]),
     }
-    setWorkSuitability(params, { Mining: 2 })
+    setWorkSuitability(params, { Mining: 0 })
     const vals = (params.GotWorkSuitabilityAddRankList as ReturnType<typeof workList>).value.values
     expect(vals).toHaveLength(1)
     expect(vals[0].WorkSuitability.value.value).toBe('EPalWorkSuitability::Handcraft')
   })
 
-  it('grants a suitability the species lacks (no CraftSpeeds entry → full bonus)', () => {
+  it('grants a suitability the pal has no lists for at all', () => {
     const params: Record<string, unknown> = {
       CraftSpeeds: workList('CraftSpeeds', [['EmitFlame', 2]]),
     }
@@ -642,12 +640,10 @@ describe('setWorkSuitability', () => {
   })
 
   it('routes through applyPalEdit', () => {
-    const params: Record<string, unknown> = {
-      CraftSpeeds: workList('CraftSpeeds', [['Handcraft', 1]]),
-    }
+    const params: Record<string, unknown> = {}
     applyPalEdit(params, { workSuitability: { Handcraft: 3 } })
     const vals = (params.GotWorkSuitabilityAddRankList as ReturnType<typeof workList>).value.values
-    expect(vals[0].Rank.value).toBe(2)
+    expect(vals[0].Rank.value).toBe(3)
   })
 })
 

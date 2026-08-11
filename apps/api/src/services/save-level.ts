@@ -552,19 +552,16 @@ export function setPassives(params: Record<string, unknown>, passives: string[])
 }
 
 /**
- * Set work-suitability levels. `targets` maps a short enum key (e.g.
- * "Handcraft") to the desired TOTAL level (0–5). The base rank in CraftSpeeds
- * mirrors the species data and is left untouched (the game re-derives it);
- * instead the difference above base goes into GotWorkSuitabilityAddRankList —
- * the same list the condenser/books write to. A target at or below the base
- * rank removes the bonus entry (levels can't drop below the species base).
+ * Set work-suitability BONUS ranks. `targets` maps a short enum key (e.g.
+ * "Handcraft") to the bonus written into GotWorkSuitabilityAddRankList — the
+ * same list the condenser/books use, on top of the species base the game
+ * derives itself (current saves don't store the base per pal). A bonus of 0
+ * removes the entry, dropping the level back to the species base.
  */
 export function setWorkSuitability(
   params: Record<string, unknown>,
   targets: Record<string, number>,
 ): void {
-  const base = workRanks(params, 'CraftSpeeds')
-
   // Template entry for new bonus lines: clone an existing PalWorkSuitabilityInfo
   // struct (add list first, then CraftSpeeds) so the exact shape is preserved.
   const template = (): Record<string, unknown> => {
@@ -608,7 +605,7 @@ export function setWorkSuitability(
     if (!(WORK_SUITABILITY_TYPES as readonly string[]).includes(key)) {
       throw new Error(`Unknown work suitability: ${key}`)
     }
-    const bonus = Math.max(0, Math.min(5, total) - (base.get(key) ?? 0))
+    const bonus = Math.max(0, Math.min(10, total))
     const list = ensureAddList()
     const idx = list.findIndex((item) => workKey(dig(item, 'WorkSuitability')) === key)
     if (bonus === 0) {

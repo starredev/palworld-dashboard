@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
-import { X, HeartPulse, Copy, Layers, Plus, Send, Star } from 'lucide-vue-next'
+import { X, HeartPulse, Copy, Layers, Minus, Plus, Send, Star } from 'lucide-vue-next'
 import { Button, Input } from '@tsuki/ui'
 import type { PalSummary } from '@tsuki/types'
 import { api } from '@/lib/api'
 import { useQueueOp } from '@/composables/use-save-batch'
 import { PASSIVES, passiveName, passiveDef, KIND_COLOR } from '../passives'
-import { WORK_TYPES } from '../work'
+import { WORK_TYPES, useSpeciesWork } from '../work'
 
 const props = defineProps<{ pal: PalSummary | null; uid: string | null }>()
 const emit = defineEmits<{ close: []; done: [] }>()
@@ -18,10 +18,9 @@ const form = ref({ level: '', stars: 0, hp: '', shot: '', defense: '', heal: fal
 // Selected passive ids (prefilled from the pal; unknown ids are preserved).
 const passives = ref<string[]>([])
 const addPick = ref('')
-// Work suitability totals (base species rank + condenser bonus), editable 0–5.
-// The base rank is a floor: the backend only writes the bonus above it.
-const work = ref<Record<string, number>>({})
-const workBase = ref<Record<string, number>>({})
+// Work suitability: level shown = species base + bonus. Only the bonus lives
+// in the save (the condenser/book list), so that's all we track and send.
+const workBonus = ref<Record<string, number>>({})
 const workPick = ref('')
 
 watch(
@@ -37,44 +36,47 @@ watch(
     }
     passives.value = [...(p?.passives ?? [])]
     addPick.value = ''
-    const totals: Record<string, number> = {}
-    const bases: Record<string, number> = {}
-    for (const s of p?.workSuitabilities ?? []) {
-      bases[s.type] = s.rank
-      totals[s.type] = Math.min(5, s.rank + s.add)
-    }
-    work.value = totals
-    workBase.value = bases
+    const bonuses: Record<string, number> = {}
+    for (const s of p?.workSuitabilities ?? []) if (s.add > 0) bonuses[s.type] = s.add
+    workBonus.value = bonuses
     workPick.value = ''
   },
   { immediate: true },
 )
 
-const hasWork = (key: string) => (work.value[key] ?? 0) > 0 || (workBase.value[key] ?? 0) > 0
-const workRows = computed(() => WORK_TYPES.filter((t) => hasWork(t.key)))
-const workAddable = computed(() => WORK_TYPES.filter((t) => !hasWork(t.key)))
+// Species base ranks from the dex data (current saves don't store them), or
+// the save's own rank when it's present and higher.
+const speciesWork = useSpeciesWork()
+const workBase = computed<Record<string, number>>(() => {
+  const base = { ...speciesWork.baseRanks(props.pal?.species ?? '') }
+  for (const s of props.pal?.workSuitabilities ?? []) {
+    if (s.rank > (base[s.type] ?? 0)) base[s.type] = s.rank
+  }
+  return base
+})
+const workTotal = (key: string) => (workBase.value[key] ?? 0) + (workBonus.value[key] ?? 0)
+const workRows = computed(() => WORK_TYPES.filter((t) => workTotal(t.key) > 0))
+const workAddable = computed(() => WORK_TYPES.filter((t) => workTotal(t.key) === 0))
 
-function setWork(key: string, n: number): void {
-  // Clicking the current level drops one; never below the species base.
-  const next = Math.max(workBase.value[key] ?? 0, (work.value[key] ?? 0) === n ? n - 1 : n)
-  work.value = { ...work.value, [key]: next }
+function stepWork(key: string, delta: number): void {
+  // The species base is the floor; the bonus above it caps the total at 10.
+  const base = workBase.value[key] ?? 0
+  const next = Math.max(base, Math.min(10, workTotal(key) + delta))
+  workBonus.value = { ...workBonus.value, [key]: next - base }
 }
 function addWork(key: string): void {
   if (!key) return
-  work.value = { ...work.value, [key]: 1 }
+  workBonus.value = { ...workBonus.value, [key]: 1 }
   workPick.value = ''
 }
-function workPipClass(key: string, n: number): string {
-  if (n <= (workBase.value[key] ?? 0)) return 'bg-muted-foreground/60'
-  if (n <= (work.value[key] ?? 0)) return 'bg-primary'
-  return 'bg-muted-foreground/20 hover:bg-primary/50'
-}
-// Only the keys whose total actually changed are sent.
+// Only the keys whose bonus actually changed are sent.
 const workChanged = computed<Record<string, number>>(() => {
   const orig: Record<string, number> = {}
-  for (const s of props.pal?.workSuitabilities ?? []) orig[s.type] = Math.min(5, s.rank + s.add)
+  for (const s of props.pal?.workSuitabilities ?? []) orig[s.type] = s.add
   const changed: Record<string, number> = {}
-  for (const [k, v] of Object.entries(work.value)) if ((orig[k] ?? 0) !== v) changed[k] = v
+  for (const k of new Set([...Object.keys(orig), ...Object.keys(workBonus.value)])) {
+    if ((orig[k] ?? 0) !== (workBonus.value[k] ?? 0)) changed[k] = workBonus.value[k] ?? 0
+  }
   return changed
 })
 
@@ -292,29 +294,36 @@ function queueCopy(): void {
                   <span>{{ t.icon }}</span>
                   <span class="truncate">{{ t.name }}</span>
                 </span>
-                <span class="flex items-center gap-1">
-                  <span class="flex items-center gap-0.5">
-                    <button
-                      v-for="n in 5"
-                      :key="n"
-                      type="button"
-                      :aria-label="`${t.name} level ${n}`"
-                      :title="
-                        n <= (workBase[t.key] ?? 0)
-                          ? `Species base (Lv ${workBase[t.key]})`
-                          : `Lv ${n}`
-                      "
-                      @click="setWork(t.key, n)"
-                    >
-                      <span
-                        class="block size-3 rounded-sm transition-colors"
-                        :class="workPipClass(t.key, n)"
-                      />
-                    </button>
+                <span class="flex items-center gap-1.5">
+                  <span
+                    v-if="(workBonus[t.key] ?? 0) > 0"
+                    class="text-[10px] font-semibold tabular-nums text-primary"
+                    :title="`Base ${workBase[t.key] ?? 0} + bonus ${workBonus[t.key]}`"
+                  >
+                    +{{ workBonus[t.key] }}
                   </span>
-                  <span class="w-4 text-right text-[10px] tabular-nums text-muted-foreground">
-                    {{ work[t.key] ?? 0 }}
+                  <button
+                    type="button"
+                    class="grid size-6 place-items-center rounded-md border border-border text-muted-foreground transition-colors hover:text-foreground disabled:opacity-30"
+                    :disabled="workTotal(t.key) <= (workBase[t.key] ?? 0)"
+                    :aria-label="`Lower ${t.name}`"
+                    :title="(workBase[t.key] ?? 0) > 0 ? `Species base is ${workBase[t.key]}` : ''"
+                    @click="stepWork(t.key, -1)"
+                  >
+                    <Minus class="size-3.5" />
+                  </button>
+                  <span class="w-5 text-center text-sm font-semibold tabular-nums">
+                    {{ workTotal(t.key) }}
                   </span>
+                  <button
+                    type="button"
+                    class="grid size-6 place-items-center rounded-md border border-border text-muted-foreground transition-colors hover:text-foreground disabled:opacity-30"
+                    :disabled="workTotal(t.key) >= 10"
+                    :aria-label="`Raise ${t.name}`"
+                    @click="stepWork(t.key, 1)"
+                  >
+                    <Plus class="size-3.5" />
+                  </button>
                 </span>
               </div>
             </div>
