@@ -22,6 +22,7 @@ import {
   saveEditorStatusSchema,
   playerLocationSchema,
   playerStatsSchema,
+  savePalsResponseSchema,
   savePlayersResponseSchema,
   paldeckResponseSchema,
   saveGuildsResponseSchema,
@@ -68,6 +69,7 @@ import {
   type SaveEditorStatus,
   type PlayerLocation,
   type PlayerStats,
+  type SavePalsResponse,
   type SavePlayersResponse,
   type PaldeckResponse,
   type SaveGuildsResponse,
@@ -317,6 +319,10 @@ export const api = {
 
   getSavePlayers(): Promise<SavePlayersResponse> {
     return apiFetch('/save/players', { schema: savePlayersResponseSchema })
+  },
+
+  getSavePals(): Promise<SavePalsResponse> {
+    return apiFetch('/save/pals', { schema: savePalsResponseSchema })
   },
 
   getPaldeck(): Promise<PaldeckResponse> {

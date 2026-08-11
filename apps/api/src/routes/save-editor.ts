@@ -15,6 +15,7 @@ import {
   type BasesResponse,
   type PaldeckResponse,
   type SaveEditorStatus,
+  type SavePalsResponse,
   type SavePlayersResponse,
   type SaveGuildsResponse,
 } from '@tsuki/types'
@@ -33,6 +34,7 @@ import {
   editPalInLevel,
   editPlayerStatsInLevel,
   isLevelAvailable,
+  readAllPals,
   readLevelPlayers,
   readLevelSummary,
   readPaldeck,
@@ -120,6 +122,24 @@ export async function saveEditorRoutes(app: FastifyInstance): Promise<void> {
       }
       try {
         return { available: true, players: await readLevelPlayers() }
+      } catch (error) {
+        reply.log.error(error)
+        return reply.status(400).send({ message: (error as Error).message })
+      }
+    },
+  )
+
+  // Read-only: EVERY player-owned pal in the save — the server-wide Palbox.
+  // Heavy (decodes the whole Level.sav), so the UI loads it on demand.
+  app.get(
+    '/save/pals',
+    { preHandler: authenticate },
+    async (_req, reply): Promise<SavePalsResponse> => {
+      if (!isLevelAvailable()) {
+        return reply.status(503).send({ message: 'Level.sav is not available' })
+      }
+      try {
+        return { available: true, pals: await readAllPals() }
       } catch (error) {
         reply.log.error(error)
         return reply.status(400).send({ message: (error as Error).message })

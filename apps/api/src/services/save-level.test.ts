@@ -4,6 +4,7 @@ import {
   clonePalMutate,
   copyPalMutate,
   ensureByte,
+  parseAllPals,
   parseLevelPlayers,
   parseLevelSummary,
   parsePaldeck,
@@ -11,7 +12,32 @@ import {
   refuelPlayer,
   setPlayerLevel,
   setPlayerStats,
+  setWorkSuitability,
 } from './save-level'
+
+// palworld-save-tools-shaped PalWorkSuitabilityInfo struct array (CraftSpeeds
+// and GotWorkSuitabilityAddRankList share this exact shape).
+function workList(name: string, items: [string, number][]) {
+  return {
+    array_type: 'StructProperty',
+    id: null,
+    value: {
+      prop_name: name,
+      prop_type: 'StructProperty',
+      values: items.map(([k, r]) => ({
+        WorkSuitability: {
+          id: null,
+          type: 'EnumProperty',
+          value: { type: 'EPalWorkSuitability', value: `EPalWorkSuitability::${k}` },
+        },
+        Rank: { id: null, type: 'IntProperty', value: r },
+      })),
+      type_name: 'PalWorkSuitabilityInfo',
+      id: '00000000-0000-0000-0000-000000000000',
+    },
+    type: 'ArrayProperty',
+  }
+}
 
 // palworld-save-tools-shaped Level.sav CharacterSaveParameterMap entry.
 function entry(opts: {
@@ -23,8 +49,13 @@ function entry(opts: {
   species?: string
   hpMilli?: number
   hunger?: number
+  craftSpeeds?: [string, number][]
+  addRanks?: [string, number][]
 }) {
   const params: Record<string, unknown> = {}
+  if (opts.craftSpeeds) params.CraftSpeeds = workList('CraftSpeeds', opts.craftSpeeds)
+  if (opts.addRanks)
+    params.GotWorkSuitabilityAddRankList = workList('GotWorkSuitabilityAddRankList', opts.addRanks)
   if (opts.isPlayer) params.IsPlayer = { value: true, type: 'BoolProperty' }
   if (opts.nick !== undefined) params.NickName = { value: opts.nick, type: 'StrProperty' }
   if (opts.level !== undefined)
@@ -500,6 +531,123 @@ describe('copyPalMutate', () => {
     const json = world()
     json.properties.worldSaveData.value.CharacterSaveParameterMap.value.splice(0, 1) // drop player B
     expect(() => copyPalMutate(json, A, SRC, B, B_BOX)).toThrow(/target player/i)
+  })
+})
+
+describe('parseAllPals', () => {
+  it('lists every owned pal with its owner resolved; skips wild/unowned records', () => {
+    const json = levelJson([
+      entry({ isPlayer: true, playerUid: MELVIN_GUID, nick: 'Melvin265' }),
+      entry({
+        isPlayer: true,
+        playerUid: 'a87a257d-0000-0000-0000-000000000000',
+        nick: 'Invisiouz',
+      }),
+      entry({
+        species: 'Foxparks',
+        level: 10,
+        ownerUid: MELVIN_GUID,
+        craftSpeeds: [['EmitFlame', 2]],
+        addRanks: [['EmitFlame', 1]],
+      }),
+      entry({
+        species: 'Cattiva',
+        level: 12,
+        ownerUid: 'a87a257d-0000-0000-0000-000000000000',
+      }),
+      entry({ species: 'WildLamball', level: 3 }), // no owner — excluded
+    ])
+    const pals = parseAllPals(json)
+    expect(pals.map((p) => p.species)).toEqual(['Cattiva', 'Foxparks']) // level desc
+    expect(pals[0].ownerName).toBe('Invisiouz')
+    expect(pals[0].ownerUid).toBe('A87A257D000000000000000000000000')
+    expect(pals[1].ownerName).toBe('Melvin265')
+    expect(pals[1].ownerUid).toBe(MELVIN)
+    expect(pals[1].workSuitabilities).toEqual([{ type: 'EmitFlame', rank: 2, add: 1 }])
+  })
+})
+
+describe('setWorkSuitability', () => {
+  it('writes the bonus above the species base into the add list; base list untouched', () => {
+    const params: Record<string, unknown> = {
+      CraftSpeeds: workList('CraftSpeeds', [['Handcraft', 2]]),
+    }
+    setWorkSuitability(params, { Handcraft: 4 })
+    const node = params.GotWorkSuitabilityAddRankList as {
+      type: string
+      array_type: string
+      value: { type_name: string; values: unknown[] }
+    }
+    expect(node.type).toBe('ArrayProperty')
+    expect(node.array_type).toBe('StructProperty')
+    expect(node.value.type_name).toBe('PalWorkSuitabilityInfo')
+    const item = node.value.values[0] as {
+      WorkSuitability: { value: { value: string } }
+      Rank: { value: number }
+    }
+    expect(item.WorkSuitability.value.value).toBe('EPalWorkSuitability::Handcraft')
+    expect(item.Rank.value).toBe(2) // 4 total − 2 base
+    // Base CraftSpeeds rank is left alone (the game derives it from the species).
+    const base = (params.CraftSpeeds as ReturnType<typeof workList>).value.values[0]
+    expect(base.Rank.value).toBe(2)
+  })
+
+  it('updates an existing bonus entry in place', () => {
+    const params: Record<string, unknown> = {
+      CraftSpeeds: workList('CraftSpeeds', [['Handcraft', 1]]),
+      GotWorkSuitabilityAddRankList: workList('GotWorkSuitabilityAddRankList', [['Handcraft', 1]]),
+    }
+    setWorkSuitability(params, { Handcraft: 5 })
+    const vals = (params.GotWorkSuitabilityAddRankList as ReturnType<typeof workList>).value.values
+    expect(vals).toHaveLength(1)
+    expect(vals[0].Rank.value).toBe(4)
+  })
+
+  it('removes the bonus entry when the target is at or below the base rank', () => {
+    const params: Record<string, unknown> = {
+      CraftSpeeds: workList('CraftSpeeds', [['Mining', 2]]),
+      GotWorkSuitabilityAddRankList: workList('GotWorkSuitabilityAddRankList', [
+        ['Mining', 2],
+        ['Handcraft', 1],
+      ]),
+    }
+    setWorkSuitability(params, { Mining: 2 })
+    const vals = (params.GotWorkSuitabilityAddRankList as ReturnType<typeof workList>).value.values
+    expect(vals).toHaveLength(1)
+    expect(vals[0].WorkSuitability.value.value).toBe('EPalWorkSuitability::Handcraft')
+  })
+
+  it('grants a suitability the species lacks (no CraftSpeeds entry → full bonus)', () => {
+    const params: Record<string, unknown> = {
+      CraftSpeeds: workList('CraftSpeeds', [['EmitFlame', 2]]),
+    }
+    setWorkSuitability(params, { Watering: 3 })
+    const vals = (params.GotWorkSuitabilityAddRankList as ReturnType<typeof workList>).value.values
+    expect(vals[0].WorkSuitability.value.value).toBe('EPalWorkSuitability::Watering')
+    expect(vals[0].Rank.value).toBe(3)
+  })
+
+  it('creates the add list from scratch when the pal has neither list', () => {
+    const params: Record<string, unknown> = {}
+    setWorkSuitability(params, { Handcraft: 2 })
+    const node = params.GotWorkSuitabilityAddRankList as {
+      value: { prop_name: string; values: { Rank: { value: number } }[] }
+    }
+    expect(node.value.prop_name).toBe('GotWorkSuitabilityAddRankList')
+    expect(node.value.values[0].Rank.value).toBe(2)
+  })
+
+  it('rejects an unknown suitability key', () => {
+    expect(() => setWorkSuitability({}, { Hacking: 5 })).toThrow(/unknown work suitability/i)
+  })
+
+  it('routes through applyPalEdit', () => {
+    const params: Record<string, unknown> = {
+      CraftSpeeds: workList('CraftSpeeds', [['Handcraft', 1]]),
+    }
+    applyPalEdit(params, { workSuitability: { Handcraft: 3 } })
+    const vals = (params.GotWorkSuitabilityAddRankList as ReturnType<typeof workList>).value.values
+    expect(vals[0].Rank.value).toBe(2)
   })
 })
 

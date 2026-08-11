@@ -7,6 +7,7 @@ import type { PalSummary } from '@tsuki/types'
 import { api } from '@/lib/api'
 import { useQueueOp } from '@/composables/use-save-batch'
 import { PASSIVES, passiveName, passiveDef, KIND_COLOR } from '../passives'
+import { WORK_TYPES } from '../work'
 
 const props = defineProps<{ pal: PalSummary | null; uid: string | null }>()
 const emit = defineEmits<{ close: []; done: [] }>()
@@ -17,6 +18,11 @@ const form = ref({ level: '', stars: 0, hp: '', shot: '', defense: '', heal: fal
 // Selected passive ids (prefilled from the pal; unknown ids are preserved).
 const passives = ref<string[]>([])
 const addPick = ref('')
+// Work suitability totals (base species rank + condenser bonus), editable 0–5.
+// The base rank is a floor: the backend only writes the bonus above it.
+const work = ref<Record<string, number>>({})
+const workBase = ref<Record<string, number>>({})
+const workPick = ref('')
 
 watch(
   () => props.pal,
@@ -31,9 +37,46 @@ watch(
     }
     passives.value = [...(p?.passives ?? [])]
     addPick.value = ''
+    const totals: Record<string, number> = {}
+    const bases: Record<string, number> = {}
+    for (const s of p?.workSuitabilities ?? []) {
+      bases[s.type] = s.rank
+      totals[s.type] = Math.min(5, s.rank + s.add)
+    }
+    work.value = totals
+    workBase.value = bases
+    workPick.value = ''
   },
   { immediate: true },
 )
+
+const hasWork = (key: string) => (work.value[key] ?? 0) > 0 || (workBase.value[key] ?? 0) > 0
+const workRows = computed(() => WORK_TYPES.filter((t) => hasWork(t.key)))
+const workAddable = computed(() => WORK_TYPES.filter((t) => !hasWork(t.key)))
+
+function setWork(key: string, n: number): void {
+  // Clicking the current level drops one; never below the species base.
+  const next = Math.max(workBase.value[key] ?? 0, (work.value[key] ?? 0) === n ? n - 1 : n)
+  work.value = { ...work.value, [key]: next }
+}
+function addWork(key: string): void {
+  if (!key) return
+  work.value = { ...work.value, [key]: 1 }
+  workPick.value = ''
+}
+function workPipClass(key: string, n: number): string {
+  if (n <= (workBase.value[key] ?? 0)) return 'bg-muted-foreground/60'
+  if (n <= (work.value[key] ?? 0)) return 'bg-primary'
+  return 'bg-muted-foreground/20 hover:bg-primary/50'
+}
+// Only the keys whose total actually changed are sent.
+const workChanged = computed<Record<string, number>>(() => {
+  const orig: Record<string, number> = {}
+  for (const s of props.pal?.workSuitabilities ?? []) orig[s.type] = Math.min(5, s.rank + s.add)
+  const changed: Record<string, number> = {}
+  for (const [k, v] of Object.entries(work.value)) if ((orig[k] ?? 0) !== v) changed[k] = v
+  return changed
+})
 
 // Dataset options not already on the pal (dedupe against current selection).
 const addable = computed(() => PASSIVES.filter((d) => !passives.value.includes(d.id)))
@@ -83,6 +126,7 @@ function queueEdit(): void {
         ...(starsChanged.value ? { stars: form.value.stars } : {}),
         ...(form.value.heal ? { heal: true } : {}),
         ...(passivesChanged.value ? { passives: passives.value } : {}),
+        ...(Object.keys(workChanged.value).length ? { workSuitability: workChanged.value } : {}),
       },
     },
     { onSuccess: done },
@@ -138,7 +182,7 @@ function queueCopy(): void {
         <div
           role="dialog"
           aria-modal="true"
-          class="relative z-10 w-full max-w-sm rounded-2xl border border-border bg-card p-6 shadow-2xl"
+          class="relative z-10 max-h-[85vh] w-full max-w-sm overflow-y-auto rounded-2xl border border-border bg-card p-6 shadow-2xl"
         >
           <button
             class="absolute right-4 top-4 text-muted-foreground hover:text-foreground"
@@ -230,6 +274,61 @@ function queueCopy(): void {
                 </option>
               </select>
               <Button variant="outline" size="sm" :disabled="!addPick" @click="addPassive(addPick)">
+                <Plus />
+              </Button>
+            </div>
+          </div>
+
+          <!-- Work suitability (crafting = Handiwork). Base levels are a floor. -->
+          <div class="mt-4">
+            <p class="text-xs font-medium text-muted-foreground">Work suitability</p>
+            <div v-if="workRows.length" class="mt-1.5 space-y-1">
+              <div
+                v-for="t in workRows"
+                :key="t.key"
+                class="flex items-center justify-between gap-2 rounded-md bg-muted/40 px-2 py-1"
+              >
+                <span class="flex min-w-0 items-center gap-1.5 text-xs">
+                  <span>{{ t.icon }}</span>
+                  <span class="truncate">{{ t.name }}</span>
+                </span>
+                <span class="flex items-center gap-1">
+                  <span class="flex items-center gap-0.5">
+                    <button
+                      v-for="n in 5"
+                      :key="n"
+                      type="button"
+                      :aria-label="`${t.name} level ${n}`"
+                      :title="
+                        n <= (workBase[t.key] ?? 0)
+                          ? `Species base (Lv ${workBase[t.key]})`
+                          : `Lv ${n}`
+                      "
+                      @click="setWork(t.key, n)"
+                    >
+                      <span
+                        class="block size-3 rounded-sm transition-colors"
+                        :class="workPipClass(t.key, n)"
+                      />
+                    </button>
+                  </span>
+                  <span class="w-4 text-right text-[10px] tabular-nums text-muted-foreground">
+                    {{ work[t.key] ?? 0 }}
+                  </span>
+                </span>
+              </div>
+            </div>
+            <div v-if="workAddable.length" class="mt-1.5 flex items-center gap-1.5">
+              <select
+                v-model="workPick"
+                class="h-8 min-w-0 flex-1 rounded-lg border border-border bg-background px-2 text-xs outline-none focus:ring-2 focus:ring-ring"
+              >
+                <option value="">Add work suitability…</option>
+                <option v-for="t in workAddable" :key="t.key" :value="t.key">
+                  {{ t.icon }} {{ t.name }}
+                </option>
+              </select>
+              <Button variant="outline" size="sm" :disabled="!workPick" @click="addWork(workPick)">
                 <Plus />
               </Button>
             </div>

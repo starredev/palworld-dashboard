@@ -3,13 +3,16 @@ import { join } from 'node:path'
 import { randomUUID } from 'node:crypto'
 import type { FastifyInstance } from 'fastify'
 import type {
+  BoxPal,
   LevelSummary,
   PaldeckOwner,
   PalEditInput,
+  PalSummary,
   PlayerStats,
   PlayerStatsInput,
   SavePlayer,
   StatusPoints,
+  WorkSuitability,
 } from '@tsuki/types'
 import { readSaveJson, isSaveEditorAvailable } from './save-editor'
 import { editSaveFile } from './save-edit'
@@ -126,6 +129,75 @@ function readStatusPoints(params: Record<string, unknown>): StatusPoints | null 
   return any ? out : null
 }
 
+// The save's short EPalWorkSuitability keys, in the in-game display order.
+export const WORK_SUITABILITY_TYPES = [
+  'EmitFlame', // Kindling
+  'Watering',
+  'Seeding', // Planting
+  'GenerateElectricity',
+  'Handcraft', // Handiwork (crafting)
+  'Collection', // Gathering
+  'Deforest', // Lumbering
+  'Mining',
+  'OilExtraction',
+  'ProductMedicine',
+  'Cool', // Cooling
+  'Transport', // Transporting
+  'MonsterFarm', // Farming
+] as const
+
+/** "EPalWorkSuitability::Handcraft" → "Handcraft" (null for anything else). */
+function workKey(node: unknown): string | null {
+  return enumVal(node)?.split('::').pop() ?? null
+}
+
+/** Rank per suitability from a PalWorkSuitabilityInfo array (CraftSpeeds or the add list). */
+function workRanks(params: Record<string, unknown>, listKey: string): Map<string, number> {
+  const out = new Map<string, number>()
+  const vals = dig(params[listKey], 'value', 'values')
+  if (!Array.isArray(vals)) return out
+  for (const item of vals) {
+    const key = workKey(dig(item, 'WorkSuitability'))
+    const rank = numVal(dig(item, 'Rank'))
+    if (key && typeof rank === 'number') out.set(key, rank)
+  }
+  return out
+}
+
+/** A pal's work suitabilities (base + condenser bonus), nonzero lines only. */
+function readWorkSuitabilities(params: Record<string, unknown>): WorkSuitability[] {
+  const base = workRanks(params, 'CraftSpeeds')
+  const add = workRanks(params, 'GotWorkSuitabilityAddRankList')
+  const out: WorkSuitability[] = []
+  for (const type of WORK_SUITABILITY_TYPES) {
+    const rank = base.get(type) ?? 0
+    const bonus = add.get(type) ?? 0
+    if (rank > 0 || bonus > 0) out.push({ type, rank, add: bonus })
+  }
+  return out
+}
+
+/** Build the shared pal summary from one CharacterSaveParameterMap entry. */
+function palSummaryFrom(entry: unknown, params: Record<string, unknown>): PalSummary {
+  const inst = dig(entry, 'key', 'InstanceId', 'value')
+  const rare = params['IsRarePal']
+  return {
+    species: strVal(params['CharacterID']) ?? 'Unknown',
+    nickname: strVal(params['NickName']),
+    level: byteVal(params['Level']) ?? 1,
+    gender: enumVal(params['Gender'])?.split('::').pop() ?? null,
+    instanceId: typeof inst === 'string' ? inst : null,
+    // Rank byte is stars + 1 (Rank 1 / absent = 0 stars); clamp to 0–4.
+    stars: Math.min(4, Math.max(0, (byteVal(params['Rank']) ?? 1) - 1)),
+    talentHp: byteVal(params['Talent_HP']),
+    talentShot: byteVal(params['Talent_Shot']),
+    talentDefense: byteVal(params['Talent_Defense']),
+    lucky: isVN(rare) && rare.value === true,
+    passives: readPassives(params),
+    workSuitabilities: readWorkSuitabilities(params),
+  }
+}
+
 type Stats = Pick<
   PlayerStats,
   'nickName' | 'level' | 'exp' | 'hp' | 'hunger' | 'sanity' | 'statusPoints'
@@ -161,22 +233,7 @@ export function parsePlayerStats(levelJson: unknown, uid: string): Omit<PlayerSt
         }
       }
     } else if (uidMatches(dig(params['OwnerPlayerUId'], 'value'), uid)) {
-      const inst = dig(entry, 'key', 'InstanceId', 'value')
-      const rare = params['IsRarePal']
-      pals.push({
-        species: strVal(params['CharacterID']) ?? 'Unknown',
-        nickname: strVal(params['NickName']),
-        level: byteVal(params['Level']) ?? 1,
-        gender: enumVal(params['Gender'])?.split('::').pop() ?? null,
-        instanceId: typeof inst === 'string' ? inst : null,
-        // Rank byte is stars + 1 (Rank 1 / absent = 0 stars); clamp to 0–4.
-        stars: Math.min(4, Math.max(0, (byteVal(params['Rank']) ?? 1) - 1)),
-        talentHp: byteVal(params['Talent_HP']),
-        talentShot: byteVal(params['Talent_Shot']),
-        talentDefense: byteVal(params['Talent_Defense']),
-        lucky: isVN(rare) && rare.value === true,
-        passives: readPassives(params),
-      })
+      pals.push(palSummaryFrom(entry, params))
     }
   }
 
@@ -200,6 +257,45 @@ export function parseLevelSummary(levelJson: unknown): Omit<LevelSummary, 'avail
 /** Read a player's stats + pals from Level.sav (decodes the whole file). */
 export async function readPlayerStats(uid: string): Promise<Omit<PlayerStats, 'available'>> {
   return parsePlayerStats(await readSaveJson(levelSavPath()), uid)
+}
+
+/**
+ * Pure: EVERY player-owned pal in the save (the server-wide Palbox). Wild and
+ * NPC records have no OwnerPlayerUId matching a player, so they're skipped.
+ * Owner names are resolved from the player records in the same pass.
+ */
+export function parseAllPals(levelJson: unknown): BoxPal[] {
+  // PlayerUId GUIDs are `<id>` + zero groups — key owners by the leading 8 hex.
+  const names = new Map<string, { uid: string; name: string | null }>()
+  const palEntries: { entry: unknown; params: Record<string, unknown>; owner: string }[] = []
+  for (const entry of characterEntries(levelJson)) {
+    const params = saveParam(entry)
+    if (!params) continue
+    if (isPlayerParams(params)) {
+      const g = dig(entry, 'key', 'PlayerUId', 'value')
+      if (typeof g === 'string') {
+        const uid = normUid(g).toUpperCase()
+        names.set(uid.slice(0, 8), { uid, name: strVal(params['NickName']) })
+      }
+    } else {
+      const g = dig(params['OwnerPlayerUId'], 'value')
+      if (typeof g === 'string' && normUid(g)) {
+        palEntries.push({ entry, params, owner: normUid(g).toUpperCase() })
+      }
+    }
+  }
+  const pals: BoxPal[] = []
+  for (const { entry, params, owner } of palEntries) {
+    const player = names.get(owner.slice(0, 8))
+    if (!player) continue
+    pals.push({ ...palSummaryFrom(entry, params), ownerUid: player.uid, ownerName: player.name })
+  }
+  return pals.sort((a, b) => b.level - a.level)
+}
+
+/** All player-owned pals from Level.sav (decodes the whole file — heavy). */
+export async function readAllPals(): Promise<BoxPal[]> {
+  return parseAllPals(await readSaveJson(levelSavPath()))
 }
 
 /**
@@ -455,6 +551,86 @@ export function setPassives(params: Record<string, unknown>, passives: string[])
   }
 }
 
+/**
+ * Set work-suitability levels. `targets` maps a short enum key (e.g.
+ * "Handcraft") to the desired TOTAL level (0–5). The base rank in CraftSpeeds
+ * mirrors the species data and is left untouched (the game re-derives it);
+ * instead the difference above base goes into GotWorkSuitabilityAddRankList —
+ * the same list the condenser/books write to. A target at or below the base
+ * rank removes the bonus entry (levels can't drop below the species base).
+ */
+export function setWorkSuitability(
+  params: Record<string, unknown>,
+  targets: Record<string, number>,
+): void {
+  const base = workRanks(params, 'CraftSpeeds')
+
+  // Template entry for new bonus lines: clone an existing PalWorkSuitabilityInfo
+  // struct (add list first, then CraftSpeeds) so the exact shape is preserved.
+  const template = (): Record<string, unknown> => {
+    for (const listKey of ['GotWorkSuitabilityAddRankList', 'CraftSpeeds']) {
+      const vals = dig(params[listKey], 'value', 'values')
+      if (Array.isArray(vals) && vals.length) {
+        return JSON.parse(JSON.stringify(vals[0])) as Record<string, unknown>
+      }
+    }
+    // palworld-save-tools shape for a PalWorkSuitabilityInfo struct instance.
+    return {
+      WorkSuitability: {
+        id: null,
+        type: 'EnumProperty',
+        value: { type: 'EPalWorkSuitability', value: '' },
+      },
+      Rank: { id: null, type: 'IntProperty', value: 0 },
+    }
+  }
+
+  const ensureAddList = (): unknown[] => {
+    const existing = dig(params['GotWorkSuitabilityAddRankList'], 'value', 'values')
+    if (Array.isArray(existing)) return existing
+    const values: unknown[] = []
+    params['GotWorkSuitabilityAddRankList'] = {
+      array_type: 'StructProperty',
+      id: null,
+      value: {
+        prop_name: 'GotWorkSuitabilityAddRankList',
+        prop_type: 'StructProperty',
+        values,
+        type_name: 'PalWorkSuitabilityInfo',
+        id: '00000000-0000-0000-0000-000000000000',
+      },
+      type: 'ArrayProperty',
+    }
+    return values
+  }
+
+  for (const [key, total] of Object.entries(targets)) {
+    if (!(WORK_SUITABILITY_TYPES as readonly string[]).includes(key)) {
+      throw new Error(`Unknown work suitability: ${key}`)
+    }
+    const bonus = Math.max(0, Math.min(5, total) - (base.get(key) ?? 0))
+    const list = ensureAddList()
+    const idx = list.findIndex((item) => workKey(dig(item, 'WorkSuitability')) === key)
+    if (bonus === 0) {
+      if (idx >= 0) list.splice(idx, 1)
+      continue
+    }
+    if (idx >= 0) {
+      const rank = dig(list[idx], 'Rank')
+      if (isVN(rank)) rank.value = bonus
+      continue
+    }
+    const item = template()
+    const enumNode = dig(item, 'WorkSuitability', 'value')
+    if (enumNode && typeof enumNode === 'object') {
+      ;(enumNode as Record<string, unknown>)['value'] = `EPalWorkSuitability::${key}`
+    }
+    const rank = dig(item, 'Rank')
+    if (isVN(rank)) rank.value = bonus
+    list.push(item)
+  }
+}
+
 export function applyPalEdit(params: Record<string, unknown>, input: PalEditInput): void {
   if (input.level !== undefined)
     ensureByte(params, 'Level', input.level, ['Rank', 'Talent_HP', 'Talent_Shot', 'Talent_Defense'])
@@ -468,6 +644,7 @@ export function applyPalEdit(params: Record<string, unknown>, input: PalEditInpu
   if (input.talentDefense !== undefined)
     ensureByte(params, 'Talent_Defense', input.talentDefense, ['Talent_HP', 'Talent_Shot'])
   if (input.passives !== undefined) setPassives(params, input.passives)
+  if (input.workSuitability !== undefined) setWorkSuitability(params, input.workSuitability)
   if (input.heal) healPal(params)
 }
 

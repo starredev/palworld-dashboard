@@ -44,6 +44,19 @@ export const playerDetailSchema = z.object({
 })
 export type PlayerDetail = z.infer<typeof playerDetailSchema>
 
+/**
+ * One work-suitability line on a pal. `type` is the save's short enum key
+ * (e.g. "Handcraft" for Handiwork). `rank` is the base rank stored in
+ * CraftSpeeds (mirrors the species data); `add` is the bonus rank from
+ * GotWorkSuitabilityAddRankList (condenser/books). Effective level = rank + add.
+ */
+export const workSuitabilitySchema = z.object({
+  type: z.string(),
+  rank: z.number(),
+  add: z.number(),
+})
+export type WorkSuitability = z.infer<typeof workSuitabilitySchema>
+
 /** A pal owned by a player, summarised from Level.sav. */
 export const palSummarySchema = z.object({
   species: z.string(),
@@ -60,8 +73,24 @@ export const palSummarySchema = z.object({
   lucky: z.boolean(),
   /** Passive skill internal ids (e.g. "MoveSpeed_up_3"). */
   passives: z.array(z.string()),
+  /** Work suitabilities with a nonzero base or bonus rank. */
+  workSuitabilities: z.array(workSuitabilitySchema),
 })
 export type PalSummary = z.infer<typeof palSummarySchema>
+
+/** A pal as listed in the server-wide Palbox: summary + who owns it. */
+export const boxPalSchema = palSummarySchema.extend({
+  /** Owner uid in save-file form (32-hex uppercase). */
+  ownerUid: z.string(),
+  ownerName: z.string().nullable(),
+})
+export type BoxPal = z.infer<typeof boxPalSchema>
+
+export const savePalsResponseSchema = z.object({
+  available: z.boolean(),
+  pals: z.array(boxPalSchema),
+})
+export type SavePalsResponse = z.infer<typeof savePalsResponseSchema>
 
 /** Edit one pal (all fields optional; at least one required). */
 export const palEditInputSchema = z
@@ -75,6 +104,13 @@ export const palEditInputSchema = z
     heal: z.boolean().optional(),
     /** Replace the pal's passive skills (internal ids). Max 4, deduped. */
     passives: z.array(z.string().min(1)).max(4).optional(),
+    /**
+     * Desired TOTAL work-suitability level per short enum key (e.g.
+     * { Handcraft: 4 }). The backend writes the difference above the pal's
+     * base rank into GotWorkSuitabilityAddRankList (the condenser-bonus list),
+     * so a level can't drop below the species base.
+     */
+    workSuitability: z.record(z.string(), z.number().int().min(0).max(5)).optional(),
   })
   .refine((v) => Object.values(v).some((x) => x !== undefined), {
     message: 'Nothing to change',
