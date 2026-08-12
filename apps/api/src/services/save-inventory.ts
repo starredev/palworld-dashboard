@@ -223,6 +223,13 @@ export function addItemToContainer(
       if (clone && rawData && typeof rawData === 'object') {
         const prev = dig(rawData, 'value', 'trailing_bytes')
         rawData.value = packedValue(free, staticId, count, Array.isArray(prev) ? prev.length : 0)
+        // Old-format slots also carry an outer SlotIndex property. The clone
+        // keeps the template's index, so two slots would claim the same index
+        // and the game silently drops the new one — keep it in sync.
+        const outer = (clone as Record<string, unknown>)['SlotIndex']
+        if (outer && typeof outer === 'object' && 'value' in outer) {
+          ;(outer as { value: unknown }).value = free
+        }
         slots.push(clone)
         return
       }

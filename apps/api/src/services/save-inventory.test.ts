@@ -77,6 +77,15 @@ describe('addItemToContainer', () => {
     expect((slots[1] as unknown as { CustomVersionData: unknown }).CustomVersionData).toBeDefined()
   })
 
+  it('syncs the outer SlotIndex property on an appended old-format slot', () => {
+    const oldFormatSlot = { SlotIndex: { value: 0 }, ...slot('Wood', 10, 0) }
+    const json = levelJson([oldFormatSlot], 42)
+    addItemToContainer(json, GUID.replace(/-/g, ''), 'Ammo_AssaultRifleBullet', 500)
+    const appended = slotsOf(json)[1] as unknown as { SlotIndex: { value: number } }
+    expect(appended.SlotIndex.value).toBe(1)
+    expect(slotsOf(json)[1].RawData.value).toMatchObject({ slot_index: 1, count: 500 })
+  })
+
   it('fills the lowest free index, into an empty container, using a template from elsewhere', () => {
     const json = levelJson([], 6)
     // A second container provides the clone template.
