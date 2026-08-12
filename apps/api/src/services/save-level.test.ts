@@ -4,6 +4,7 @@ import {
   clonePalMutate,
   copyPalMutate,
   ensureByte,
+  findPalRef,
   parseAllPals,
   parseLevelPlayers,
   parseLevelSummary,
@@ -51,6 +52,7 @@ function entry(opts: {
   hunger?: number
   craftSpeeds?: [string, number][]
   addRanks?: [string, number][]
+  slotContainer?: string
 }) {
   const params: Record<string, unknown> = {}
   if (opts.craftSpeeds) params.CraftSpeeds = workList('CraftSpeeds', opts.craftSpeeds)
@@ -65,6 +67,11 @@ function entry(opts: {
     params.Hp = { value: { Value: { value: opts.hpMilli } }, struct_type: 'FixedPoint64' }
   if (opts.hunger !== undefined) params.FullStomach = { value: opts.hunger, type: 'FloatProperty' }
   if (opts.ownerUid) params.OwnerPlayerUId = { value: opts.ownerUid, struct_type: 'Guid' }
+  if (opts.slotContainer)
+    params.SlotID = {
+      value: { ContainerId: { value: { ID: { value: opts.slotContainer } } } },
+      type: 'StructProperty',
+    }
   return {
     key: { PlayerUId: { value: opts.playerUid ?? '00000000-0000-0000-0000-000000000000' } },
     value: { RawData: { value: { object: { SaveParameter: { value: params } } } } },
@@ -645,6 +652,62 @@ describe('parseAllPals', () => {
     expect(pals[1].ownerName).toBe('Melvin265')
     expect(pals[1].ownerUid).toBe(MELVIN)
     expect(pals[1].workSuitabilities).toEqual([{ type: 'EmitFlame', rank: 2, add: 1 }])
+  })
+
+  it('includes base workers (no owner, slotted in a base container) as BASE', () => {
+    const BASE_CONT = 'cccc1111-0000-0000-0000-000000000000'
+    const json = levelJson([
+      entry({ species: 'Anubis', level: 45, slotContainer: BASE_CONT }),
+      entry({ species: 'WildLamball', level: 3 }), // no owner, no base slot — excluded
+    ]) as { properties: { worldSaveData: { value: Record<string, unknown> } } }
+    json.properties.worldSaveData.value.BaseCampSaveData = {
+      value: [
+        {
+          key: 'b-1',
+          value: {
+            RawData: { value: { group_id_belong_to: 'abcd0001-0000-0000-0000-000000000000' } },
+            WorkerDirector: { value: { RawData: { value: { container_id: BASE_CONT } } } },
+          },
+        },
+      ],
+    }
+    json.properties.worldSaveData.value.GroupSaveDataMap = {
+      value: [
+        {
+          value: {
+            RawData: {
+              value: {
+                group_id: 'abcd0001-0000-0000-0000-000000000000',
+                group_type: 'EPalGroupType::Guild',
+                guild_name: 'Tsuki',
+              },
+            },
+          },
+        },
+      ],
+    }
+    const pals = parseAllPals(json)
+    expect(pals.map((p) => p.species)).toEqual(['Anubis'])
+    expect(pals[0].ownerUid).toBe('BASE')
+    expect(pals[0].ownerName).toBe('Base · Tsuki')
+  })
+})
+
+describe('findPalRef', () => {
+  it('finds a base worker via the BASE sentinel; owner uids still guard', () => {
+    const e = entry({ species: 'Anubis', level: 45 })
+    e.key = { PlayerUId: { value: '00000000-0000-0000-0000-000000000000' } } as never
+    ;(
+      e.value.RawData.value.object.SaveParameter.value as Record<string, unknown>
+    ).CharacterID ??= { value: 'Anubis', type: 'NameProperty' }
+    const json = levelJson([e])
+    const entries = (
+      json as { properties: { worldSaveData: { value: { CharacterSaveParameterMap: { value: unknown[] } } } } }
+    ).properties.worldSaveData.value.CharacterSaveParameterMap.value
+    const inst = 'aaaa2222-0000-0000-0000-000000000000'
+    ;(entries[0] as { key: Record<string, unknown> }).key.InstanceId = { value: inst }
+    expect(findPalRef(json, 'BASE', inst)).not.toBeNull()
+    expect(findPalRef(json, MELVIN, inst)).toBeNull()
   })
 })
 

@@ -183,6 +183,9 @@ const num = (s: string) => {
 }
 
 const canApply = computed(() => !!props.pal?.instanceId && !!props.uid)
+// Base workers (sentinel uid) live in a base container, not a player's box —
+// clone/copy target player boxes, so those actions are hidden for them.
+const isBasePal = computed(() => props.uid === 'BASE')
 const queue = useQueueOp()
 
 function queueEdit(): void {
@@ -508,7 +511,7 @@ function queueCopy(): void {
           </p>
 
           <!-- Copy this pal into another player's Pal Box -->
-          <div v-if="copyTargets.length" class="mt-4 border-t border-border pt-4">
+          <div v-if="copyTargets.length && !isBasePal" class="mt-4 border-t border-border pt-4">
             <p class="mb-1.5 text-xs font-medium text-muted-foreground">Copy to another player</p>
             <div class="flex items-center gap-1.5">
               <select
@@ -533,6 +536,7 @@ function queueCopy(): void {
 
           <div class="mt-6 flex items-center justify-between gap-2">
             <Button
+              v-if="!isBasePal"
               variant="outline"
               size="sm"
               :disabled="!canApply || queue.isPending.value"
@@ -540,6 +544,8 @@ function queueCopy(): void {
             >
               <Copy /> Duplicate
             </Button>
+            <span v-else />
+
             <div class="flex gap-2">
               <Button variant="outline" size="sm" @click="emit('close')">Cancel</Button>
               <Button size="sm" :disabled="!canApply || queue.isPending.value" @click="queueEdit">

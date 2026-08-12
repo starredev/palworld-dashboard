@@ -266,15 +266,58 @@ export async function readPlayerStats(uid: string): Promise<Omit<PlayerStats, 'a
   return parsePlayerStats(await readSaveJson(levelSavPath()), uid)
 }
 
+/** Sentinel ownerUid for pals working at a base camp (no OwnerPlayerUId). */
+export const BASE_OWNER = 'BASE'
+
+/** A non-zero owner guid — assigned base workers have theirs cleared/zeroed. */
+function hasOwnerGuid(owner: unknown): owner is string {
+  return typeof owner === 'string' && /[1-9a-fA-F]/.test(normUid(owner))
+}
+
+/** The container guid (hex) a pal is slotted into, from its SlotID struct. */
+function slotContainerId(params: Record<string, unknown>): string {
+  return hex(dig(params['SlotID'], 'value', 'ContainerId', 'value', 'ID', 'value'))
+}
+
 /**
- * Pure: EVERY player-owned pal in the save (the server-wide Palbox). Wild and
- * NPC records have no OwnerPlayerUId matching a player, so they're skipped.
- * Owner names are resolved from the player records in the same pass.
+ * Base-camp worker container ids → owning guild name. Each base's
+ * WorkerDirector RawData (decoded by the default converter) carries the
+ * container that holds the pals working at that base.
+ */
+function baseContainers(levelJson: unknown): Map<string, string | null> {
+  const out = new Map<string, string | null>()
+  const bases = dig(deepFind(levelJson, 'BaseCampSaveData'), 'value')
+  if (!Array.isArray(bases)) return out
+  const guildNames = new Map<string, string>()
+  const groups = dig(deepFind(levelJson, 'GroupSaveDataMap'), 'value')
+  if (Array.isArray(groups)) {
+    for (const g of groups) {
+      const raw = dig(g, 'value', 'RawData', 'value') as Record<string, unknown> | undefined
+      if (!raw || typeof raw !== 'object') continue
+      const id = hex(raw['group_id'])
+      const name = raw['guild_name'] ?? raw['guild_name_2'] ?? raw['group_name']
+      if (id && typeof name === 'string' && name) guildNames.set(id, name)
+    }
+  }
+  for (const b of bases) {
+    const cid = hex(deepFind(dig(b, 'value', 'WorkerDirector'), 'container_id'))
+    if (!cid) continue
+    const gid = hex(deepFind(dig(b, 'value', 'RawData'), 'group_id_belong_to'))
+    out.set(cid, (gid && guildNames.get(gid)) || null)
+  }
+  return out
+}
+
+/**
+ * Pure: EVERY pal in the save (the server-wide Palbox): player-owned pals plus
+ * base workers (no OwnerPlayerUId; matched to a base's worker container, which
+ * also keeps wild/NPC records out). Base pals get the `BASE` sentinel ownerUid.
  */
 export function parseAllPals(levelJson: unknown): BoxPal[] {
   // PlayerUId GUIDs are `<id>` + zero groups — key owners by the leading 8 hex.
   const names = new Map<string, { uid: string; name: string | null }>()
   const palEntries: { entry: unknown; params: Record<string, unknown>; owner: string }[] = []
+  const unowned: { entry: unknown; params: Record<string, unknown> }[] = []
   for (const entry of characterEntries(levelJson)) {
     const params = saveParam(entry)
     if (!params) continue
@@ -286,8 +329,10 @@ export function parseAllPals(levelJson: unknown): BoxPal[] {
       }
     } else {
       const g = dig(params['OwnerPlayerUId'], 'value')
-      if (typeof g === 'string' && normUid(g)) {
+      if (hasOwnerGuid(g)) {
         palEntries.push({ entry, params, owner: normUid(g).toUpperCase() })
+      } else {
+        unowned.push({ entry, params })
       }
     }
   }
@@ -296,6 +341,16 @@ export function parseAllPals(levelJson: unknown): BoxPal[] {
     const player = names.get(owner.slice(0, 8))
     if (!player) continue
     pals.push({ ...palSummaryFrom(entry, params), ownerUid: player.uid, ownerName: player.name })
+  }
+  const bases = baseContainers(levelJson)
+  for (const { entry, params } of unowned) {
+    const guild = bases.get(slotContainerId(params))
+    if (guild === undefined) continue
+    pals.push({
+      ...palSummaryFrom(entry, params),
+      ownerUid: BASE_OWNER,
+      ownerName: guild ? `Base · ${guild}` : 'Base workers',
+    })
   }
   return pals.sort((a, b) => b.level - a.level)
 }
@@ -744,7 +799,10 @@ export function applyPalEdit(params: Record<string, unknown>, input: PalEditInpu
 
 const hexOnly = (s: string) => s.replace(/[^0-9a-fA-F]/g, '').toLowerCase()
 
-/** Find a specific pal by owner uid + its InstanceId (a ref into json). */
+/**
+ * Find a specific pal by owner uid + its InstanceId (a ref into json). Base
+ * workers have no OwnerPlayerUId — they're addressed with the BASE sentinel.
+ */
 export function findPalRef(
   levelJson: unknown,
   uid: string,
@@ -754,7 +812,8 @@ export function findPalRef(
   for (const entry of characterEntries(levelJson)) {
     const params = saveParam(entry)
     if (!params || isPlayerParams(params)) continue
-    if (!uidMatches(dig(params['OwnerPlayerUId'], 'value'), uid)) continue
+    const owner = dig(params['OwnerPlayerUId'], 'value')
+    if (hasOwnerGuid(owner) ? !uidMatches(owner, uid) : uid.toUpperCase() !== BASE_OWNER) continue
     const inst = dig(entry, 'key', 'InstanceId', 'value')
     if (typeof inst === 'string' && hexOnly(inst) === target) return params
   }
