@@ -273,8 +273,10 @@ export function addItemToContainer(
 
 export type EquipKind = 'weapon' | 'armor' | 'single'
 
-// Generous flat durability — the game caps the bar at the item's own max.
-const EQUIP_DURABILITY = 10_000
+// Durability is an absolute number and per-item maxima run past 70k for
+// endgame gear — write a value above every max so items always arrive full
+// (the game caps at the item's own max).
+const EQUIP_DURABILITY = 1_000_000
 
 /** The DynamicItemSaveData values array (each entry wraps a decoded RawData). */
 function dynamicItemValues(levelJson: unknown): unknown[] | null {
