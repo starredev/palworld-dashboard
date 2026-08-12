@@ -259,6 +259,29 @@ describe('applyPalEdit', () => {
     ])
   })
 
+  it('alpha: adds the BOSS_ prefix to CharacterID', () => {
+    const params: Record<string, unknown> = {
+      CharacterID: { value: 'Foxparks', type: 'NameProperty' },
+    }
+    applyPalEdit(params, { alpha: true })
+    expect((params.CharacterID as { value: string }).value).toBe('BOSS_Foxparks')
+    // Already alpha → unchanged (no double prefix).
+    applyPalEdit(params, { alpha: true })
+    expect((params.CharacterID as { value: string }).value).toBe('BOSS_Foxparks')
+  })
+
+  it('alpha: strips the BOSS_ prefix when turned off', () => {
+    const params: Record<string, unknown> = {
+      CharacterID: { value: 'BOSS_Foxparks', type: 'NameProperty' },
+    }
+    applyPalEdit(params, { alpha: false })
+    expect((params.CharacterID as { value: string }).value).toBe('Foxparks')
+  })
+
+  it('alpha: throws when the pal has no CharacterID', () => {
+    expect(() => applyPalEdit({}, { alpha: true })).toThrow(/CharacterID/)
+  })
+
   it('heals: clears sickness/revive and tops sanity', () => {
     const params: Record<string, unknown> = {
       SanityValue: { value: 20, type: 'FloatProperty' },

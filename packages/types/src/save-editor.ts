@@ -102,6 +102,11 @@ export const palEditInputSchema = z
     talentShot: z.number().int().min(0).max(100).optional(),
     talentDefense: z.number().int().min(0).max(100).optional(),
     heal: z.boolean().optional(),
+    /**
+     * Alpha (boss) variant. The game keys this off a `BOSS_` prefix on
+     * CharacterID; IsRarePal is the separate Lucky (sparkle) flag.
+     */
+    alpha: z.boolean().optional(),
     /** Replace the pal's passive skills (internal ids). Max 4, deduped. */
     passives: z.array(z.string().min(1)).max(4).optional(),
     /**

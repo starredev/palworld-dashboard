@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { useQuery } from '@tanstack/vue-query'
-import { X, HeartPulse, Copy, Layers, Minus, Plus, Send, Star } from 'lucide-vue-next'
+import { X, Crown, HeartPulse, Copy, Layers, Minus, Plus, Send, Star } from 'lucide-vue-next'
 import { Button, Input } from '@tsuki/ui'
 import type { PalSummary } from '@tsuki/types'
 import { api } from '@/lib/api'
 import { useQueueOp } from '@/composables/use-save-batch'
-import { PASSIVES, passiveName, passiveDef, KIND_COLOR } from '../passives'
+import { PASSIVES, passiveName, passiveDef, KIND_COLOR, KIND_ORDER, KIND_LABEL } from '../passives'
 import { WORK_TYPES, useSpeciesWork } from '../work'
 
 const props = defineProps<{ pal: PalSummary | null; uid: string | null }>()
@@ -14,7 +14,10 @@ const emit = defineEmits<{ close: []; done: [] }>()
 
 const done = () => (emit('done'), emit('close'))
 
-const form = ref({ level: '', stars: 0, hp: '', shot: '', defense: '', heal: false })
+// Alpha (boss) status lives in the species id itself: a BOSS_ prefix.
+const isAlpha = (species: string | null | undefined) => /^BOSS_/i.test(species ?? '')
+
+const form = ref({ level: '', stars: 0, hp: '', shot: '', defense: '', heal: false, alpha: false })
 // Selected passive ids (prefilled from the pal; unknown ids are preserved).
 const passives = ref<string[]>([])
 const addPick = ref('')
@@ -33,6 +36,7 @@ watch(
       shot: p?.talentShot != null ? String(p.talentShot) : '0',
       defense: p?.talentDefense != null ? String(p.talentDefense) : '0',
       heal: false,
+      alpha: isAlpha(p?.species),
     }
     passives.value = [...(p?.passives ?? [])]
     addPick.value = ''
@@ -80,8 +84,15 @@ const workChanged = computed<Record<string, number>>(() => {
   return changed
 })
 
-// Dataset options not already on the pal (dedupe against current selection).
+// Dataset options not already on the pal (dedupe against current selection),
+// grouped by kind for the picker's optgroups.
 const addable = computed(() => PASSIVES.filter((d) => !passives.value.includes(d.id)))
+const addableGroups = computed(() =>
+  KIND_ORDER.map((k) => ({
+    label: KIND_LABEL[k],
+    items: addable.value.filter((d) => d.kind === k),
+  })).filter((g) => g.items.length),
+)
 function addPassive(id: string): void {
   if (id && passives.value.length < 4 && !passives.value.includes(id)) passives.value.push(id)
   addPick.value = ''
@@ -98,6 +109,7 @@ const kindColor = (id: string) => KIND_COLOR[passiveDef(id)?.kind ?? 'utility']
 
 // Condensation stars 0–4. Clicking a filled star at its own position drops one.
 const starsChanged = computed(() => form.value.stars !== (props.pal?.stars ?? 0))
+const alphaChanged = computed(() => form.value.alpha !== isAlpha(props.pal?.species))
 function setStars(n: number): void {
   form.value.stars = form.value.stars === n ? n - 1 : n
 }
@@ -126,6 +138,7 @@ function queueEdit(): void {
         talentShot: num(form.value.shot),
         talentDefense: num(form.value.defense),
         ...(starsChanged.value ? { stars: form.value.stars } : {}),
+        ...(alphaChanged.value ? { alpha: form.value.alpha } : {}),
         ...(form.value.heal ? { heal: true } : {}),
         ...(passivesChanged.value ? { passives: passives.value } : {}),
         ...(Object.keys(workChanged.value).length ? { workSuitability: workChanged.value } : {}),
@@ -271,9 +284,11 @@ function queueCopy(): void {
                 class="h-8 min-w-0 flex-1 rounded-lg border border-border bg-background px-2 text-xs outline-none focus:ring-2 focus:ring-ring"
               >
                 <option value="">Add a passive…</option>
-                <option v-for="d in addable" :key="d.id" :value="d.id">
-                  {{ d.name }} — {{ d.effect }}
-                </option>
+                <optgroup v-for="g in addableGroups" :key="g.label" :label="g.label">
+                  <option v-for="d in g.items" :key="d.id" :value="d.id">
+                    {{ d.name }} — {{ d.effect }}
+                  </option>
+                </optgroup>
               </select>
               <Button variant="outline" size="sm" :disabled="!addPick" @click="addPassive(addPick)">
                 <Plus />
@@ -344,6 +359,11 @@ function queueCopy(): void {
           </div>
 
           <label class="mt-4 flex cursor-pointer items-center gap-2 text-sm">
+            <input v-model="form.alpha" type="checkbox" class="size-4 accent-amber-400" />
+            <Crown class="size-4 text-amber-400" /> Alpha (boss variant, larger model)
+          </label>
+
+          <label class="mt-2 flex cursor-pointer items-center gap-2 text-sm">
             <input v-model="form.heal" type="checkbox" class="size-4 accent-emerald-400" />
             <HeartPulse class="size-4 text-emerald-400" /> Fully heal (HP, hunger, cure sickness)
           </label>

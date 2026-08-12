@@ -628,6 +628,18 @@ export function setWorkSuitability(
   }
 }
 
+/**
+ * Toggle the Alpha (boss) variant: the game keys it off a `BOSS_` prefix on
+ * CharacterID (IsRarePal is the separate Lucky flag). Stats are untouched.
+ */
+export function setAlpha(params: Record<string, unknown>, alpha: boolean): void {
+  const node = params['CharacterID']
+  const id = strVal(node)
+  if (!isVN(node) || !id) throw new Error('Cannot set alpha: pal has no CharacterID')
+  const bare = id.replace(/^BOSS_/i, '')
+  node.value = alpha ? `BOSS_${bare}` : bare
+}
+
 export function applyPalEdit(params: Record<string, unknown>, input: PalEditInput): void {
   if (input.level !== undefined)
     ensureByte(params, 'Level', input.level, ['Rank', 'Talent_HP', 'Talent_Shot', 'Talent_Defense'])
@@ -642,6 +654,7 @@ export function applyPalEdit(params: Record<string, unknown>, input: PalEditInpu
     ensureByte(params, 'Talent_Defense', input.talentDefense, ['Talent_HP', 'Talent_Shot'])
   if (input.passives !== undefined) setPassives(params, input.passives)
   if (input.workSuitability !== undefined) setWorkSuitability(params, input.workSuitability)
+  if (input.alpha !== undefined) setAlpha(params, input.alpha)
   if (input.heal) healPal(params)
 }
 
