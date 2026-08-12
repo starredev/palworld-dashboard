@@ -337,16 +337,20 @@ export function addEquipmentToContainer(
       const created = typeof tCreated === 'string' ? tCreated : ZERO_GUID
       const local = randomUUID()
       const id = { created_world_id: created, local_id_in_created_world: local, static_id: staticId }
+      // v1.0 payload layout: 4 leading bytes, then the fields, then 4 trailing.
+      const pad = [0, 0, 0, 0]
       tRaw.value =
         kind === 'weapon'
           ? {
               id,
               type: 'weapon',
+              leading_bytes: pad,
               durability: EQUIP_DURABILITY,
               remaining_bullets: 0,
               passive_skill_list: [],
+              trailing_bytes: pad,
             }
-          : { id, type: 'armor', durability: EQUIP_DURABILITY }
+          : { id, type: 'armor', leading_bytes: pad, durability: EQUIP_DURABILITY, trailing_bytes: pad }
       dyn.push(template)
       dynamic = { created, local }
     }

@@ -151,7 +151,8 @@ const hex = (g: string) => g.replace(/-/g, '')
 
 const WORLD = 'dddd4444-0000-0000-0000-000000000000'
 
-// A decoded DynamicItemSaveData entry (weapon), used as the clone template.
+// A decoded DynamicItemSaveData entry (weapon, v1.0 layout with the leading /
+// trailing byte padding), used as the clone template.
 function dynEntry(staticId: string, localId: string) {
   return {
     RawData: {
@@ -162,9 +163,11 @@ function dynEntry(staticId: string, localId: string) {
           static_id: staticId,
         },
         type: 'weapon',
+        leading_bytes: [0, 0, 0, 0],
         durability: 100,
         remaining_bullets: 5,
         passive_skill_list: [],
+        trailing_bytes: [0, 0, 0, 0],
       },
     },
     CustomVersionData: { value: { values: [1, 2, 3] } },
@@ -219,6 +222,8 @@ describe('addEquipmentToContainer', () => {
       expect(rec!.RawData.value).toMatchObject({
         type: 'weapon',
         remaining_bullets: 0,
+        leading_bytes: [0, 0, 0, 0],
+        trailing_bytes: [0, 0, 0, 0],
         id: { static_id: 'Bow_Default_4', created_world_id: WORLD },
       })
     }
@@ -233,10 +238,14 @@ describe('addEquipmentToContainer', () => {
   it('armor records carry durability but no bullets', () => {
     const json = withDynamicItems(levelJson([slot('Wood', 10, 0)], 10), [dynEntry('Old', 'aaaa')])
     addEquipmentToContainer(json, hex(GUID), 'Armor_Cloth_5', 1, 'armor')
-    const rec = dynOf(json).at(-1)!
+    const rec = dynOf(json).at(-1)! as {
+      RawData: { value: Record<string, unknown> }
+    }
     expect(rec.RawData.value.type).toBe('armor')
     expect(rec.RawData.value.durability).toBeGreaterThan(0)
     expect(rec.RawData.value.remaining_bullets).toBeUndefined()
+    expect(rec.RawData.value.leading_bytes).toEqual([0, 0, 0, 0])
+    expect(rec.RawData.value.trailing_bytes).toEqual([0, 0, 0, 0])
   })
 
   it("'single' places per-slot copies without touching dynamic items", () => {

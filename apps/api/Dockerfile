@@ -73,6 +73,11 @@ RUN mkdir -p /opt/palworld-save-tools /tmp/hostfix \
 COPY apps/api/vendor/item_container_slots.py \
      /opt/palworld-save-tools/palworld_save_tools/rawdata/item_container_slots.py
 COPY apps/api/vendor/convert_with_items.py /opt/palworld-save-tools/convert_with_items.py
+# v1.0 dynamic-item format (4 leading/trailing bytes around the payload) —
+# cheahjs v0.24.0 predates it, and without this overlay any weapon/armor we
+# give is written misaligned and arrives broken in-game.
+COPY apps/api/vendor/dynamic_item.py \
+     /opt/palworld-save-tools/palworld_save_tools/rawdata/dynamic_item.py
 # Full-decode script (all custom decoders incl. MapObjectSaveData) for reading
 # and editing map-object data such as chest password locks.
 COPY apps/api/vendor/convert_full.py /opt/palworld-save-tools/convert_full.py
