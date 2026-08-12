@@ -27,12 +27,14 @@ import {
   setPlayerStats,
 } from './save-level'
 import {
+  addEquipmentToContainer,
   addItemToContainer,
   commonContainerGuid,
   isInventoryAvailable,
   palBoxContainerGuid,
   playerContainerGuids,
   removeItemFromContainers,
+  transferEquipmentMutate,
   transferItemMutate,
 } from './save-inventory'
 import { kickGuildMemberMutate, renameGuildMutate, setGuildLeaderMutate } from './save-guild'
@@ -66,8 +68,8 @@ function persist(ops: SaveOp[]): void {
 export function listOps(): SaveOp[] {
   return load()
 }
-export function addOp(input: SaveOpInput): SaveOp {
-  const op = { ...input, id: randomUUID() } as SaveOp
+export function addOp(input: SaveOpInput, by?: string | null): SaveOp {
+  const op = { ...input, id: randomUUID(), by: by ?? null } as SaveOp
   persist([...load(), op])
   return op
 }
@@ -95,12 +97,16 @@ function applyLevelOp(
   if (op.type === 'giveItem') {
     const g = guids[op.uid]
     if (!g) throw new Error('Inventory container not found')
+    if (op.item.equip)
+      return addEquipmentToContainer(json, g, op.item.staticId, op.item.count, op.item.equip)
     return addItemToContainer(json, g, op.item.staticId, op.item.count)
   }
   if (op.type === 'transferItem') {
     const from = srcGuids[op.fromUid]
     const to = guids[op.toUid]
     if (!from || !to) throw new Error('Inventory container not found')
+    if (op.item.equip)
+      return transferEquipmentMutate(json, from, to, op.item.staticId, op.item.count)
     return transferItemMutate(json, from, to, op.item.staticId, op.item.count)
   }
   if (op.type === 'removeItem') {

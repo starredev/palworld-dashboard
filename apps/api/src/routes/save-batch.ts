@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify'
-import { saveOpInputSchema, type SaveBatch } from '@tsuki/types'
+import { saveOpInputSchema, type SaveBatch, type SessionUser } from '@tsuki/types'
 import { authenticate, requireAdmin } from '../plugins/auth'
 import { isSaveEditAvailable } from '../services/save-edit'
 import { addOp, applyBatch, clearOps, listOps, removeOp } from '../services/save-batch'
@@ -13,7 +13,9 @@ export async function saveBatchRoutes(app: FastifyInstance): Promise<void> {
   app.post('/save/batch', { preHandler: requireAdmin }, async (req, reply) => {
     const parsed = saveOpInputSchema.safeParse(req.body)
     if (!parsed.success) return reply.status(400).send({ message: 'Invalid edit' })
-    return addOp(parsed.data)
+    // Stamp who queued the edit — shown in the batch bar and the audit trail.
+    const user = req.user as SessionUser | undefined
+    return addOp(parsed.data, user?.name ?? null)
   })
 
   app.delete<{ Params: { id: string } }>(

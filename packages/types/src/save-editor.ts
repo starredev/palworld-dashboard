@@ -214,6 +214,13 @@ export const giveItemInputSchema = z.object({
   // High cap so gold (the `Money` item, effectively unbounded) can be topped up;
   // normal items just clamp to their own max stack in-game.
   count: z.number().int().min(1).max(9_999_999),
+  /**
+   * Equipment handling. 'weapon'/'armor' place ONE copy per slot and create a
+   * DynamicItemSaveData record (durability etc.) — required or the game can't
+   * use the item. 'single' is one-per-slot without a dynamic record
+   * (accessories). Absent = stackable material.
+   */
+  equip: z.enum(['weapon', 'armor', 'single']).optional(),
 })
 export type GiveItemInput = z.infer<typeof giveItemInputSchema>
 
@@ -470,23 +477,26 @@ export const saveOpInputSchema = z.discriminatedUnion('type', [
 ])
 export type SaveOpInput = z.infer<typeof saveOpInputSchema>
 
+// Fields the API adds when an op is queued: its id + who requested it.
+const opAudit = { id: z.string(), by: z.string().nullable().optional() }
+
 export const saveOpSchema = z.discriminatedUnion('type', [
-  z.object({ ...teleportOp, id: z.string() }),
-  z.object({ ...techOp, id: z.string() }),
-  z.object({ ...levelOp, id: z.string() }),
-  z.object({ ...refuelOp, id: z.string() }),
-  z.object({ ...statsOp, id: z.string() }),
-  z.object({ ...palEditOp, id: z.string() }),
-  z.object({ ...palCloneOp, id: z.string() }),
-  z.object({ ...palCopyOp, id: z.string() }),
-  z.object({ ...giveOp, id: z.string() }),
-  z.object({ ...transferItemOp, id: z.string() }),
-  z.object({ ...removeItemOp, id: z.string() }),
-  z.object({ ...guildRenameOp, id: z.string() }),
-  z.object({ ...guildLeaderOp, id: z.string() }),
-  z.object({ ...guildKickOp, id: z.string() }),
-  z.object({ ...chestUnlockOp, id: z.string() }),
-  z.object({ ...baseAreaOp, id: z.string() }),
+  z.object({ ...teleportOp, ...opAudit }),
+  z.object({ ...techOp, ...opAudit }),
+  z.object({ ...levelOp, ...opAudit }),
+  z.object({ ...refuelOp, ...opAudit }),
+  z.object({ ...statsOp, ...opAudit }),
+  z.object({ ...palEditOp, ...opAudit }),
+  z.object({ ...palCloneOp, ...opAudit }),
+  z.object({ ...palCopyOp, ...opAudit }),
+  z.object({ ...giveOp, ...opAudit }),
+  z.object({ ...transferItemOp, ...opAudit }),
+  z.object({ ...removeItemOp, ...opAudit }),
+  z.object({ ...guildRenameOp, ...opAudit }),
+  z.object({ ...guildLeaderOp, ...opAudit }),
+  z.object({ ...guildKickOp, ...opAudit }),
+  z.object({ ...chestUnlockOp, ...opAudit }),
+  z.object({ ...baseAreaOp, ...opAudit }),
 ])
 export type SaveOp = z.infer<typeof saveOpSchema>
 

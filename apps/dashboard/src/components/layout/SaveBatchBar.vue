@@ -56,7 +56,10 @@ function onApply(): void {
           :key="op.id"
           class="flex items-center gap-2 border-b border-border/50 px-4 py-2 text-xs last:border-0"
         >
-          <span class="min-w-0 flex-1 truncate">{{ op.label }}</span>
+          <span class="min-w-0 flex-1 truncate">
+            {{ op.label }}
+            <span v-if="op.by" class="text-muted-foreground/70">· {{ op.by }}</span>
+          </span>
           <button
             class="shrink-0 text-muted-foreground hover:text-foreground"
             :disabled="remove.isPending.value"

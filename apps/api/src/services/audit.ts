@@ -102,6 +102,10 @@ export function describeAction(
       action: 'event.delete',
       summary: 'Deleted a scheduled event',
     },
+    'POST /api/save/batch/apply': {
+      action: 'save.batchApply',
+      summary: 'Applied the save-edit batch & restarted',
+    },
     'POST /api/backups': { action: 'backup.create', summary: 'Created a backup' },
     'POST /api/backups/:name/restore': { action: 'backup.restore', summary: 'Restored a backup' },
     'DELETE /api/backups/:name': { action: 'backup.delete', summary: 'Deleted a backup' },
