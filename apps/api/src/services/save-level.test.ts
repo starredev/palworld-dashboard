@@ -259,6 +259,16 @@ describe('applyPalEdit', () => {
     ])
   })
 
+  it('souls: writes the four Rank_* bytes, cloning a sibling when absent', () => {
+    const params: Record<string, unknown> = { Rank_HP: byteNode(2), Talent_HP: byteNode(50) }
+    applyPalEdit(params, { soulHp: 20, soulAttack: 10, soulDefense: 0, soulCraftSpeed: 5 })
+    expect((params.Rank_HP as { value: { value: number } }).value.value).toBe(20)
+    expect((params.Rank_Attack as { value: { value: number } }).value.value).toBe(10)
+    expect((params.Rank_Defence as { value: { value: number } }).value.value).toBe(0)
+    expect((params.Rank_CraftSpeed as { value: { value: number } }).value.value).toBe(5)
+    expect((params.Rank_Attack as { type: string }).type).toBe('ByteProperty')
+  })
+
   it('alpha: adds the BOSS_ prefix to CharacterID', () => {
     const params: Record<string, unknown> = {
       CharacterID: { value: 'Foxparks', type: 'NameProperty' },

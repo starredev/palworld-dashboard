@@ -192,6 +192,11 @@ function palSummaryFrom(entry: unknown, params: Record<string, unknown>): PalSum
     talentHp: byteVal(params['Talent_HP']),
     talentShot: byteVal(params['Talent_Shot']),
     talentDefense: byteVal(params['Talent_Defense']),
+    // Statue of Power soul ranks (note the save's "Defence" spelling).
+    soulHp: byteVal(params['Rank_HP']),
+    soulAttack: byteVal(params['Rank_Attack']),
+    soulDefense: byteVal(params['Rank_Defence']),
+    soulCraftSpeed: byteVal(params['Rank_CraftSpeed']),
     lucky: isVN(rare) && rare.value === true,
     passives: readPassives(params),
     workSuitabilities: readWorkSuitabilities(params),
@@ -652,6 +657,28 @@ export function applyPalEdit(params: Record<string, unknown>, input: PalEditInpu
     ensureByte(params, 'Talent_Shot', input.talentShot, ['Talent_HP', 'Talent_Defense'])
   if (input.talentDefense !== undefined)
     ensureByte(params, 'Talent_Defense', input.talentDefense, ['Talent_HP', 'Talent_Shot'])
+  // Statue of Power soul ranks. Any byte sibling works as a clone template; a
+  // pal that has never been soul-enhanced usually lacks all Rank_* keys.
+  const SOULS: [keyof PalEditInput, string][] = [
+    ['soulHp', 'Rank_HP'],
+    ['soulAttack', 'Rank_Attack'],
+    ['soulDefense', 'Rank_Defence'],
+    ['soulCraftSpeed', 'Rank_CraftSpeed'],
+  ]
+  for (const [field, key] of SOULS) {
+    const v = input[field]
+    if (typeof v === 'number')
+      ensureByte(params, key, v, [
+        'Rank_HP',
+        'Rank_Attack',
+        'Rank_Defence',
+        'Rank_CraftSpeed',
+        'Rank',
+        'Talent_HP',
+        'Talent_Shot',
+        'Talent_Defense',
+      ])
+  }
   if (input.passives !== undefined) setPassives(params, input.passives)
   if (input.workSuitability !== undefined) setWorkSuitability(params, input.workSuitability)
   if (input.alpha !== undefined) setAlpha(params, input.alpha)

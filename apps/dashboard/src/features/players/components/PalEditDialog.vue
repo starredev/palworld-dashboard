@@ -18,6 +18,8 @@ const done = () => (emit('done'), emit('close'))
 const isAlpha = (species: string | null | undefined) => /^BOSS_/i.test(species ?? '')
 
 const form = ref({ level: '', stars: 0, hp: '', shot: '', defense: '', heal: false, alpha: false })
+// Statue of Power soul ranks (0–20, +3% per rank).
+const souls = ref({ hp: '0', attack: '0', defense: '0', craftSpeed: '0' })
 // Selected passive ids (prefilled from the pal; unknown ids are preserved).
 const passives = ref<string[]>([])
 const addPick = ref('')
@@ -37,6 +39,12 @@ watch(
       defense: p?.talentDefense != null ? String(p.talentDefense) : '0',
       heal: false,
       alpha: isAlpha(p?.species),
+    }
+    souls.value = {
+      hp: String(p?.soulHp ?? 0),
+      attack: String(p?.soulAttack ?? 0),
+      defense: String(p?.soulDefense ?? 0),
+      craftSpeed: String(p?.soulCraftSpeed ?? 0),
     }
     passives.value = [...(p?.passives ?? [])]
     addPick.value = ''
@@ -110,6 +118,21 @@ const kindColor = (id: string) => KIND_COLOR[passiveDef(id)?.kind ?? 'utility']
 // Condensation stars 0–4. Clicking a filled star at its own position drops one.
 const starsChanged = computed(() => form.value.stars !== (props.pal?.stars ?? 0))
 const alphaChanged = computed(() => form.value.alpha !== isAlpha(props.pal?.species))
+
+// Souls: clamp to 0–20 and send only the ranks that actually changed.
+const soulClamp = (s: string) => Math.max(0, Math.min(20, Math.trunc(Number(s) || 0)))
+const soulsChanged = computed<Partial<Record<'soulHp' | 'soulAttack' | 'soulDefense' | 'soulCraftSpeed', number>>>(() => {
+  const p = props.pal
+  const out: Record<string, number> = {}
+  const pairs = [
+    ['soulHp', soulClamp(souls.value.hp), p?.soulHp ?? 0],
+    ['soulAttack', soulClamp(souls.value.attack), p?.soulAttack ?? 0],
+    ['soulDefense', soulClamp(souls.value.defense), p?.soulDefense ?? 0],
+    ['soulCraftSpeed', soulClamp(souls.value.craftSpeed), p?.soulCraftSpeed ?? 0],
+  ] as const
+  for (const [k, next, cur] of pairs) if (next !== cur) out[k] = next
+  return out
+})
 function setStars(n: number): void {
   form.value.stars = form.value.stars === n ? n - 1 : n
 }
@@ -139,6 +162,7 @@ function queueEdit(): void {
         talentDefense: num(form.value.defense),
         ...(starsChanged.value ? { stars: form.value.stars } : {}),
         ...(alphaChanged.value ? { alpha: form.value.alpha } : {}),
+        ...soulsChanged.value,
         ...(form.value.heal ? { heal: true } : {}),
         ...(passivesChanged.value ? { passives: passives.value } : {}),
         ...(Object.keys(workChanged.value).length ? { workSuitability: workChanged.value } : {}),
@@ -253,6 +277,28 @@ function queueCopy(): void {
             >
               <span class="mb-1 block text-[10px] uppercase text-muted-foreground">{{ f.l }}</span>
               <Input v-model="form[f.k as 'hp' | 'shot' | 'defense']" type="number" />
+            </label>
+          </div>
+
+          <!-- Statue of Power souls: +3% per rank, max 20 (+60%) -->
+          <p class="mt-4 text-xs font-medium text-muted-foreground">Souls (0–20, +3%/rank)</p>
+          <div class="mt-1.5 grid grid-cols-4 gap-2">
+            <label
+              v-for="f in [
+                { k: 'hp', l: 'HP' },
+                { k: 'attack', l: 'ATK' },
+                { k: 'defense', l: 'Def' },
+                { k: 'craftSpeed', l: 'Work' },
+              ]"
+              :key="f.k"
+            >
+              <span class="mb-1 block text-[10px] uppercase text-muted-foreground">{{ f.l }}</span>
+              <Input
+                v-model="souls[f.k as 'hp' | 'attack' | 'defense' | 'craftSpeed']"
+                type="number"
+                min="0"
+                max="20"
+              />
             </label>
           </div>
 

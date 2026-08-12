@@ -70,6 +70,11 @@ export const palSummarySchema = z.object({
   talentHp: z.number().nullable(),
   talentShot: z.number().nullable(),
   talentDefense: z.number().nullable(),
+  /** Statue of Power soul enhancement ranks (0–20, +3% each; absent = 0). */
+  soulHp: z.number().nullable(),
+  soulAttack: z.number().nullable(),
+  soulDefense: z.number().nullable(),
+  soulCraftSpeed: z.number().nullable(),
   lucky: z.boolean(),
   /** Passive skill internal ids (e.g. "MoveSpeed_up_3"). */
   passives: z.array(z.string()),
@@ -101,6 +106,11 @@ export const palEditInputSchema = z
     talentHp: z.number().int().min(0).max(100).optional(),
     talentShot: z.number().int().min(0).max(100).optional(),
     talentDefense: z.number().int().min(0).max(100).optional(),
+    /** Statue of Power soul ranks, 0–20 (+3% per rank). */
+    soulHp: z.number().int().min(0).max(20).optional(),
+    soulAttack: z.number().int().min(0).max(20).optional(),
+    soulDefense: z.number().int().min(0).max(20).optional(),
+    soulCraftSpeed: z.number().int().min(0).max(20).optional(),
     heal: z.boolean().optional(),
     /**
      * Alpha (boss) variant. The game keys this off a `BOSS_` prefix on
