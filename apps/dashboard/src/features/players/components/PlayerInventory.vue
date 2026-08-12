@@ -79,6 +79,17 @@ const CAT_COLOR: Record<string, string> = {
 }
 const catColor = (id: string) => CAT_COLOR[meta(id)?.c ?? 'Material'] ?? '#71717a'
 
+// Equipment needs per-slot placement + a dynamic-item record server-side;
+// accessories are per-slot without one. Anything else stacks.
+const EQUIP_KIND: Record<string, 'weapon' | 'armor' | 'single'> = {
+  Weapon: 'weapon',
+  SpecialWeapon: 'weapon',
+  Armor: 'armor',
+  Glider: 'armor',
+  Accessory: 'single',
+}
+const equipKind = (id: string) => EQUIP_KIND[meta(id)?.c ?? '']
+
 // Item rarity (0 common … 4 legendary). Common keeps the default text color.
 const RARITY_NAME = ['Common', 'Uncommon', 'Rare', 'Epic', 'Legendary']
 const RARITY_COLOR: Record<number, string> = {
@@ -134,7 +145,11 @@ function queueGive(): void {
       type: 'giveItem',
       uid: props.uid,
       label: `Give ${count}× ${givePicked.value.n}`,
-      item: { staticId: givePicked.value.id, count },
+      item: {
+        staticId: givePicked.value.id,
+        count,
+        ...(equipKind(givePicked.value.id) ? { equip: equipKind(givePicked.value.id) } : {}),
+      },
     },
     {
       onSuccess: () => {
@@ -187,7 +202,11 @@ function queueTransfer(): void {
       fromUid: props.uid,
       toUid: to.uid,
       label: `Transfer ${count}× ${src.n} → ${to.name ?? to.uid.slice(0, 8)}`,
-      item: { staticId: src.id, count },
+      item: {
+        staticId: src.id,
+        count,
+        ...(equipKind(src.id) ? { equip: equipKind(src.id) } : {}),
+      },
     },
     {
       onSuccess: () => {

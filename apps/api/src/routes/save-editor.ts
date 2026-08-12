@@ -178,7 +178,13 @@ export async function saveEditorRoutes(app: FastifyInstance): Promise<void> {
         return reply.status(400).send({ message: 'A valid item id and count are required' })
       }
       try {
-        await giveItem(app, req.params.uid, parsed.data.staticId, parsed.data.count)
+        await giveItem(
+          app,
+          req.params.uid,
+          parsed.data.staticId,
+          parsed.data.count,
+          parsed.data.equip,
+        )
         return { ok: true }
       } catch (error) {
         reply.log.error(error)

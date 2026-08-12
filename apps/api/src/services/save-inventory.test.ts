@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { addItemToContainer, removeItemFromContainers, transferItemMutate } from './save-inventory'
+import {
+  addEquipmentToContainer,
+  addItemToContainer,
+  removeItemFromContainers,
+  transferEquipmentMutate,
+  transferItemMutate,
+} from './save-inventory'
 
 const GUID = 'aaaa1111-0000-0000-0000-000000000000'
 const ZERO = '00000000-0000-0000-0000-000000000000'
@@ -142,6 +148,150 @@ describe('addItemToContainer', () => {
 })
 
 const hex = (g: string) => g.replace(/-/g, '')
+
+const WORLD = 'dddd4444-0000-0000-0000-000000000000'
+
+// A decoded DynamicItemSaveData entry (weapon), used as the clone template.
+function dynEntry(staticId: string, localId: string) {
+  return {
+    RawData: {
+      value: {
+        id: {
+          created_world_id: WORLD,
+          local_id_in_created_world: localId,
+          static_id: staticId,
+        },
+        type: 'weapon',
+        durability: 100,
+        remaining_bullets: 5,
+        passive_skill_list: [],
+      },
+    },
+    CustomVersionData: { value: { values: [1, 2, 3] } },
+  }
+}
+
+type DynJson = ReturnType<typeof levelJson> & {
+  properties: { worldSaveData: { value: Record<string, unknown> } }
+}
+function withDynamicItems(json: ReturnType<typeof levelJson>, entries: unknown[]): DynJson {
+  const j = json as DynJson
+  j.properties.worldSaveData.value.DynamicItemSaveData = { value: { values: entries } }
+  return j
+}
+const dynOf = (json: DynJson) =>
+  (json.properties.worldSaveData.value.DynamicItemSaveData as { value: { values: unknown[] } })
+    .value.values as {
+    RawData: {
+      value: {
+        id: { created_world_id: string; local_id_in_created_world: string; static_id: string }
+        type: string
+        durability: number
+        remaining_bullets?: number
+      }
+    }
+  }[]
+type EquipSlot = {
+  RawData: {
+    value: {
+      slot_index: number
+      count: number
+      item: { static_id: string; dynamic_id: { created_world_id: string; local_id_in_created_world: string } }
+    }
+  }
+}
+
+describe('addEquipmentToContainer', () => {
+  it('gives 2 weapons: one slot each, linked to fresh dynamic records', () => {
+    const json = withDynamicItems(levelJson([slot('Wood', 10, 0)], 10), [dynEntry('Old', 'aaaa')])
+    addEquipmentToContainer(json, hex(GUID), 'Bow_Default_4', 2, 'weapon')
+    const slots = slotsOf(json) as unknown as EquipSlot[]
+    expect(slots).toHaveLength(3)
+    const dyn = dynOf(json)
+    expect(dyn).toHaveLength(3)
+    for (const s of [slots[1], slots[2]]) {
+      expect(s.RawData.value.count).toBe(1)
+      expect(s.RawData.value.item.static_id).toBe('Bow_Default_4')
+      const local = s.RawData.value.item.dynamic_id.local_id_in_created_world
+      expect(s.RawData.value.item.dynamic_id.created_world_id).toBe(WORLD)
+      const rec = dyn.find((d) => d.RawData.value.id.local_id_in_created_world === local)
+      expect(rec).toBeDefined()
+      expect(rec!.RawData.value).toMatchObject({
+        type: 'weapon',
+        remaining_bullets: 0,
+        id: { static_id: 'Bow_Default_4', created_world_id: WORLD },
+      })
+    }
+    // The two copies never share a dynamic id.
+    expect(slots[1].RawData.value.item.dynamic_id.local_id_in_created_world).not.toBe(
+      slots[2].RawData.value.item.dynamic_id.local_id_in_created_world,
+    )
+    // Distinct slot indexes.
+    expect(slots[1].RawData.value.slot_index).not.toBe(slots[2].RawData.value.slot_index)
+  })
+
+  it('armor records carry durability but no bullets', () => {
+    const json = withDynamicItems(levelJson([slot('Wood', 10, 0)], 10), [dynEntry('Old', 'aaaa')])
+    addEquipmentToContainer(json, hex(GUID), 'Armor_Cloth_5', 1, 'armor')
+    const rec = dynOf(json).at(-1)!
+    expect(rec.RawData.value.type).toBe('armor')
+    expect(rec.RawData.value.durability).toBeGreaterThan(0)
+    expect(rec.RawData.value.remaining_bullets).toBeUndefined()
+  })
+
+  it("'single' places per-slot copies without touching dynamic items", () => {
+    const json = withDynamicItems(levelJson([slot('Wood', 10, 0)], 10), [dynEntry('Old', 'aaaa')])
+    addEquipmentToContainer(json, hex(GUID), 'Accessory_AT_2', 2, 'single')
+    const slots = slotsOf(json) as unknown as EquipSlot[]
+    expect(slots).toHaveLength(3)
+    expect(slots[1].RawData.value.count).toBe(1)
+    expect(slots[2].RawData.value.count).toBe(1)
+    expect(dynOf(json)).toHaveLength(1) // untouched
+  })
+
+  it('throws when there is no dynamic-item template for weapon/armor', () => {
+    const json = levelJson([slot('Wood', 10, 0)], 10)
+    expect(() => addEquipmentToContainer(json, hex(GUID), 'Bow_Default', 1, 'weapon')).toThrow(
+      /dynamic item/i,
+    )
+  })
+})
+
+describe('transferEquipmentMutate', () => {
+  it('moves a piece slot-by-slot, preserving its dynamic id', () => {
+    const SRC = 'aaaa1111-0000-0000-0000-000000000000'
+    const DST = 'bbbb2222-0000-0000-0000-000000000000'
+    const bow = slot('Bow_Default_4', 1, 0) as unknown as EquipSlot
+    bow.RawData.value.item.dynamic_id = { created_world_id: WORLD, local_id_in_created_world: 'e1e1' }
+    const json = {
+      properties: {
+        worldSaveData: {
+          value: {
+            ItemContainerSaveData: {
+              value: [
+                { key: { ID: { value: SRC } }, value: { Slots: { value: { values: [bow] } } } },
+                {
+                  key: { ID: { value: DST } },
+                  value: { SlotNum: { value: 5 }, Slots: { value: { values: [slot('Wood', 3, 0)] } } },
+                },
+              ],
+            },
+          },
+        },
+      },
+    }
+    transferEquipmentMutate(json, [hex(SRC)], hex(DST), 'Bow_Default_4', 1)
+    expect(bow.RawData.value.item.static_id).toBe('None')
+    const dstSlots = (
+      json.properties.worldSaveData.value.ItemContainerSaveData.value[1].value.Slots.value
+        .values as unknown as EquipSlot[]
+    )
+    expect(dstSlots).toHaveLength(2)
+    expect(dstSlots[1].RawData.value.item.static_id).toBe('Bow_Default_4')
+    expect(dstSlots[1].RawData.value.item.dynamic_id.local_id_in_created_world).toBe('e1e1')
+    expect(dstSlots[1].RawData.value.count).toBe(1)
+  })
+})
 
 describe('removeItemFromContainers', () => {
   it('decrements a stack and leaves the slot occupied when some remain', () => {

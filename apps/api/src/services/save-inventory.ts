@@ -2,6 +2,7 @@ import { execFile } from 'node:child_process'
 import { existsSync, rmSync } from 'node:fs'
 import { readFile, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { randomUUID } from 'node:crypto'
 import { promisify } from 'node:util'
 import type { FastifyInstance } from 'fastify'
 import type { InventoryResponse } from '@tsuki/types'
@@ -121,17 +122,84 @@ function slotRaw(slot: unknown): SlotRaw | null {
     : null
 }
 
-/** A decoded slot value for a stackable item (matches encode_bytes' fields). */
-function packedValue(slotIndex: number, staticId: string, count: number, trailingLen: number) {
+interface DynamicRef {
+  created: string
+  local: string
+}
+
+/** A decoded slot value (matches encode_bytes' fields). Static items keep the
+ *  zero dynamic id; equipment links to its DynamicItemSaveData record. */
+function packedValue(
+  slotIndex: number,
+  staticId: string,
+  count: number,
+  trailingLen: number,
+  dynamic?: DynamicRef,
+) {
   return {
     slot_index: slotIndex,
     count,
     item: {
       static_id: staticId,
-      dynamic_id: { created_world_id: ZERO_GUID, local_id_in_created_world: ZERO_GUID },
+      dynamic_id: {
+        created_world_id: dynamic?.created ?? ZERO_GUID,
+        local_id_in_created_world: dynamic?.local ?? ZERO_GUID,
+      },
     },
     trailing_bytes: new Array(Math.max(0, trailingLen)).fill(0) as number[],
   }
+}
+
+/** The target container's entry + mutable Slots array. */
+function containerEntry(
+  levelJson: unknown,
+  guidHex: string,
+): { entry: unknown; slots: unknown[] } {
+  const entries = dig(deepFind(levelJson, 'ItemContainerSaveData'), 'value')
+  const entry = Array.isArray(entries)
+    ? entries.find((e) => hex(dig(e, 'key', 'ID', 'value')) === guidHex)
+    : undefined
+  const slots = dig(entry, 'value', 'Slots', 'value', 'values')
+  if (!Array.isArray(slots)) throw new Error('Inventory container not found')
+  return { entry, slots }
+}
+
+/** Lowest slot index below SlotNum not taken by an occupied slot (-1 = none). */
+function freeSlotIndex(entry: unknown, slots: unknown[]): number {
+  const slotNum = dig(entry, 'value', 'SlotNum', 'value')
+  if (typeof slotNum !== 'number') return -1
+  const used = new Set(
+    slots
+      .map((s) => dig(s, 'RawData', 'value', 'slot_index'))
+      .filter((n): n is number => typeof n === 'number'),
+  )
+  for (let i = 0; i < slotNum; i++) if (!used.has(i)) return i
+  return -1
+}
+
+/** Clone a structural template and append a new occupied slot at `free`. */
+function appendSlot(
+  levelJson: unknown,
+  slots: unknown[],
+  free: number,
+  staticId: string,
+  count: number,
+  dynamic?: DynamicRef,
+): boolean {
+  const template = anySlotTemplate(levelJson, slots)
+  const clone: unknown = template ? JSON.parse(JSON.stringify(template)) : null
+  const rawData = dig(clone, 'RawData') as Record<string, unknown> | undefined
+  if (!clone || !rawData || typeof rawData !== 'object') return false
+  const prev = dig(rawData, 'value', 'trailing_bytes')
+  rawData.value = packedValue(free, staticId, count, Array.isArray(prev) ? prev.length : 0, dynamic)
+  // Old-format slots also carry an outer SlotIndex property — keep it in sync
+  // or two slots claim the same index and the game drops the new one.
+  const outer = (clone as Record<string, unknown>)['SlotIndex']
+  if (outer && typeof outer === 'object' && 'value' in outer) {
+    ;(outer as { value: unknown }).value = free
+  }
+  slots.push(clone)
+  return true
 }
 
 /** Any occupied slot in the level, to clone as a structural template for a new
@@ -168,12 +236,7 @@ export function addItemToContainer(
   staticId: string,
   count: number,
 ): void {
-  const entries = dig(deepFind(levelJson, 'ItemContainerSaveData'), 'value')
-  const entry = Array.isArray(entries)
-    ? entries.find((e) => hex(dig(e, 'key', 'ID', 'value')) === guidHex)
-    : undefined
-  const slots = dig(entry, 'value', 'Slots', 'value', 'values')
-  if (!Array.isArray(slots)) throw new Error('Inventory container not found')
+  const { entry, slots } = containerEntry(levelJson, guidHex)
 
   for (const slot of slots) {
     const raw = slotRaw(slot)
@@ -199,43 +262,146 @@ export function addItemToContainer(
     }
   }
 
-  // Append into spare capacity. Only possible when SlotNum (capacity) is known;
-  // pick the lowest slot index not already taken.
-  const slotNum = dig(entry, 'value', 'SlotNum', 'value')
-  if (typeof slotNum === 'number') {
-    const used = new Set(
-      slots
-        .map((s) => dig(s, 'RawData', 'value', 'slot_index'))
-        .filter((n): n is number => typeof n === 'number'),
-    )
-    let free = -1
-    for (let i = 0; i < slotNum; i++)
-      if (!used.has(i)) {
-        free = i
-        break
-      }
-    if (free >= 0) {
-      // Deep-clone an existing slot (whole struct incl. CustomVersionData) so the
-      // new slot re-encodes with the right property shape, then set its payload.
-      const template = anySlotTemplate(levelJson, slots)
-      const clone: unknown = template ? JSON.parse(JSON.stringify(template)) : null
-      const rawData = dig(clone, 'RawData') as Record<string, unknown> | undefined
-      if (clone && rawData && typeof rawData === 'object') {
-        const prev = dig(rawData, 'value', 'trailing_bytes')
-        rawData.value = packedValue(free, staticId, count, Array.isArray(prev) ? prev.length : 0)
-        // Old-format slots also carry an outer SlotIndex property. The clone
-        // keeps the template's index, so two slots would claim the same index
-        // and the game silently drops the new one — keep it in sync.
-        const outer = (clone as Record<string, unknown>)['SlotIndex']
-        if (outer && typeof outer === 'object' && 'value' in outer) {
-          ;(outer as { value: unknown }).value = free
-        }
-        slots.push(clone)
-        return
-      }
+  // Append into spare capacity (needs SlotNum to know the container's size).
+  const free = freeSlotIndex(entry, slots)
+  if (free < 0 || !appendSlot(levelJson, slots, free, staticId, count)) {
+    throw new Error('Inventory is full (no free slot)')
+  }
+}
+
+// ---- Equipment (weapons / armor): one slot per copy + a dynamic-item record ----
+
+export type EquipKind = 'weapon' | 'armor' | 'single'
+
+// Generous flat durability — the game caps the bar at the item's own max.
+const EQUIP_DURABILITY = 10_000
+
+/** The DynamicItemSaveData values array (each entry wraps a decoded RawData). */
+function dynamicItemValues(levelJson: unknown): unknown[] | null {
+  const values = dig(deepFind(levelJson, 'DynamicItemSaveData'), 'value', 'values')
+  return Array.isArray(values) ? values : null
+}
+
+/** Occupy an emptied ('None') slot in place, or append at a free index. */
+function placeSingle(
+  levelJson: unknown,
+  entry: unknown,
+  slots: unknown[],
+  staticId: string,
+  dynamic?: DynamicRef,
+): void {
+  const none = slots.map(slotRaw).find((r) => r && r.item.static_id === 'None')
+  if (none) {
+    none.item.static_id = staticId
+    none.count = 1
+    ;(none.item as { dynamic_id?: unknown }).dynamic_id = {
+      created_world_id: dynamic?.created ?? ZERO_GUID,
+      local_id_in_created_world: dynamic?.local ?? ZERO_GUID,
+    }
+    return
+  }
+  const free = freeSlotIndex(entry, slots)
+  if (free < 0 || !appendSlot(levelJson, slots, free, staticId, 1, dynamic)) {
+    throw new Error('Inventory is full (no free slot)')
+  }
+}
+
+/**
+ * Give equipment: `count` copies, ONE per slot. 'weapon'/'armor' also append a
+ * DynamicItemSaveData record (durability etc.) linked via the slot's
+ * dynamic_id — without it the game shows a dead item it can't equip. 'single'
+ * places per-slot copies without a record (accessories carry no dynamic data).
+ */
+export function addEquipmentToContainer(
+  levelJson: unknown,
+  guidHex: string,
+  staticId: string,
+  count: number,
+  kind: EquipKind,
+): void {
+  const { entry, slots } = containerEntry(levelJson, guidHex)
+  const dyn = kind === 'single' ? null : dynamicItemValues(levelJson)
+  if (kind !== 'single' && (!dyn || !dyn.length)) {
+    throw new Error('No dynamic item data in the save to clone from')
+  }
+  for (let n = 0; n < count; n++) {
+    let dynamic: DynamicRef | undefined
+    if (dyn) {
+      // Clone an existing record for the exact struct shape, then replace the
+      // decoded payload. created_world_id must match this world's id, so reuse
+      // the template's.
+      const template = JSON.parse(JSON.stringify(dyn[0])) as Record<string, unknown>
+      const tRaw = dig(template, 'RawData') as Record<string, unknown> | undefined
+      if (!tRaw || typeof tRaw !== 'object') throw new Error('Unrecognised dynamic item shape')
+      const tCreated = dig(tRaw, 'value', 'id', 'created_world_id')
+      const created = typeof tCreated === 'string' ? tCreated : ZERO_GUID
+      const local = randomUUID()
+      const id = { created_world_id: created, local_id_in_created_world: local, static_id: staticId }
+      tRaw.value =
+        kind === 'weapon'
+          ? {
+              id,
+              type: 'weapon',
+              durability: EQUIP_DURABILITY,
+              remaining_bullets: 0,
+              passive_skill_list: [],
+            }
+          : { id, type: 'armor', durability: EQUIP_DURABILITY }
+      dyn.push(template)
+      dynamic = { created, local }
+    }
+    placeSingle(levelJson, entry, slots, staticId, dynamic)
+  }
+}
+
+/**
+ * Move `count` pieces of equipment between players, slot by slot, PRESERVING
+ * each piece's dynamic_id link (durability etc. live in DynamicItemSaveData,
+ * keyed by that id — a count-based transfer would sever it).
+ */
+export function transferEquipmentMutate(
+  levelJson: unknown,
+  fromGuids: string[],
+  toGuid: string,
+  staticId: string,
+  count: number,
+): void {
+  const entries = dig(deepFind(levelJson, 'ItemContainerSaveData'), 'value')
+  if (!Array.isArray(entries)) throw new Error('Inventory container not found')
+  const wanted = new Set(fromGuids)
+  const sources: SlotRaw[] = []
+  for (const entry of entries) {
+    if (!wanted.has(hex(dig(entry, 'key', 'ID', 'value')))) continue
+    const slots = dig(entry, 'value', 'Slots', 'value', 'values')
+    if (!Array.isArray(slots)) continue
+    for (const slot of slots) {
+      const raw = slotRaw(slot)
+      if (raw && raw.item.static_id === staticId) sources.push(raw)
     }
   }
-  throw new Error('Inventory is full (no free slot)')
+  if (sources.length < count) {
+    throw new Error(`Not enough of that item to transfer (have ${sources.length}, need ${count})`)
+  }
+  const { entry: target, slots: targetSlots } = containerEntry(levelJson, toGuid)
+  for (let n = 0; n < count; n++) {
+    const src = sources[n]
+    const dynId = (
+      src.item as {
+        dynamic_id?: { created_world_id?: string; local_id_in_created_world?: string }
+      }
+    ).dynamic_id
+    const dynamic =
+      dynId?.local_id_in_created_world && dynId.local_id_in_created_world !== ZERO_GUID
+        ? { created: dynId.created_world_id ?? ZERO_GUID, local: dynId.local_id_in_created_world }
+        : undefined
+    placeSingle(levelJson, target, targetSlots, staticId, dynamic)
+    src.item.static_id = 'None'
+    ;(src.item as { dynamic_id?: unknown }).dynamic_id = {
+      created_world_id: ZERO_GUID,
+      local_id_in_created_world: ZERO_GUID,
+    }
+    src.count = 0
+  }
 }
 
 /**
@@ -375,7 +541,12 @@ export async function giveItem(
   uid: string,
   staticId: string,
   count: number,
+  equip?: EquipKind,
 ): Promise<void> {
   const guid = await commonContainerGuid(uid)
-  await editLevelWithItems(app, (json) => addItemToContainer(json, guid, staticId, count))
+  await editLevelWithItems(app, (json) =>
+    equip
+      ? addEquipmentToContainer(json, guid, staticId, count, equip)
+      : addItemToContainer(json, guid, staticId, count),
+  )
 }
