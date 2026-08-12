@@ -13,8 +13,9 @@ const data = ref<InventoryResponse | null>(null)
 const loading = ref(false)
 const error = ref('')
 
-// id -> { n: display name, c: category, img?: icon filename }. Lazy-loaded.
-type ItemMeta = { n: string; c: string; img?: string }
+// id -> { n: display name, c: category, img?: icon filename, r?: rarity 0-4 }.
+// Lazy-loaded.
+type ItemMeta = { n: string; c: string; img?: string; r?: number }
 const items = ref<Record<string, ItemMeta>>({})
 const itemsLower = ref<Record<string, ItemMeta>>({})
 const broken = ref<Set<string>>(new Set())
@@ -77,6 +78,23 @@ const CAT_COLOR: Record<string, string> = {
   Blueprint: '#22d3ee',
 }
 const catColor = (id: string) => CAT_COLOR[meta(id)?.c ?? 'Material'] ?? '#71717a'
+
+// Item rarity (0 common … 4 legendary). Common keeps the default text color.
+const RARITY_NAME = ['Common', 'Uncommon', 'Rare', 'Epic', 'Legendary']
+const RARITY_COLOR: Record<number, string> = {
+  1: '#4ade80',
+  2: '#38bdf8',
+  3: '#c084fc',
+  4: '#facc15',
+}
+const rarityColor = (id: string): string | null => {
+  const r = meta(id)?.r
+  return r ? (RARITY_COLOR[r] ?? null) : null
+}
+const itemTitle = (id: string): string => {
+  const r = meta(id)?.r
+  return r != null ? `${id} · ${RARITY_NAME[r] ?? '?'}` : id
+}
 
 // ---- Give item ----
 const giveSearch = ref('')
@@ -232,7 +250,12 @@ function queueRemove(item: { id: string; count: number }): void {
               class="size-2.5 shrink-0 rounded-full"
               :style="{ backgroundColor: catColor(item.id) }"
             />
-            <span class="min-w-0 flex-1 truncate" :title="item.id">{{ label(item.id) }}</span>
+            <span
+              class="min-w-0 flex-1 truncate"
+              :title="itemTitle(item.id)"
+              :style="rarityColor(item.id) ? { color: rarityColor(item.id)! } : undefined"
+              >{{ label(item.id) }}</span
+            >
             <span class="shrink-0 font-medium text-muted-foreground">×{{ item.count }}</span>
             <button
               v-if="canEdit"
@@ -278,7 +301,11 @@ function queueRemove(item: { id: string; count: number }): void {
                   class="size-4 shrink-0 object-contain"
                   @error="onImgError(m.id)"
                 />
-                {{ m.n }}
+                <span
+                  :title="itemTitle(m.id)"
+                  :style="rarityColor(m.id) ? { color: rarityColor(m.id)! } : undefined"
+                  >{{ m.n }}</span
+                >
               </button>
             </div>
           </div>
