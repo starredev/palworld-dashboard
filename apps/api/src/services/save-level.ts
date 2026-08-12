@@ -197,6 +197,8 @@ function palSummaryFrom(entry: unknown, params: Record<string, unknown>): PalSum
     soulAttack: byteVal(params['Rank_Attack']),
     soulDefense: byteVal(params['Rank_Defence']),
     soulCraftSpeed: byteVal(params['Rank_CraftSpeed']),
+    craftSpeed: numVal(params['CraftSpeed']),
+    equippedSkills: readWazaList(params, 'EquipWaza'),
     lucky: isVN(rare) && rare.value === true,
     passives: readPassives(params),
     workSuitabilities: readWorkSuitabilities(params),
@@ -633,6 +635,59 @@ export function setWorkSuitability(
   }
 }
 
+// ---- Active skills (waza) & base work speed ----
+
+const WAZA_PREFIX = 'EPalWazaID::'
+
+/** Read a waza ArrayProperty as bare skill ids (prefix stripped). */
+function readWazaList(params: Record<string, unknown>, key: string): string[] {
+  const vals = dig(params[key], 'value', 'values')
+  if (!Array.isArray(vals)) return []
+  return vals
+    .filter((v): v is string => typeof v === 'string')
+    .map((v) => (v.startsWith(WAZA_PREFIX) ? v.slice(WAZA_PREFIX.length) : v))
+}
+
+/** Overwrite a waza ArrayProperty in place, creating the node when missing. */
+function writeWazaList(params: Record<string, unknown>, key: string, values: string[]): void {
+  const existing = params[key]
+  const valuesNode = dig(existing, 'value')
+  if (isVN(existing) && valuesNode && typeof valuesNode === 'object') {
+    ;(valuesNode as Record<string, unknown>)['values'] = values
+  } else {
+    params[key] = {
+      array_type: 'EnumProperty',
+      id: null,
+      value: { values },
+      type: 'ArrayProperty',
+    }
+  }
+}
+
+/**
+ * Equip active skills (max 3, deduped). Equipped skills must also be in the
+ * pal's MasteredWaza (learned) list or the game shows empty slots, so the
+ * missing ones are appended there too — existing learned skills are kept.
+ */
+export function setEquippedSkills(params: Record<string, unknown>, ids: string[]): void {
+  const equip = [...new Set(ids.filter((s) => typeof s === 'string' && s.length))]
+    .slice(0, 3)
+    .map((s) => (s.startsWith(WAZA_PREFIX) ? s : `${WAZA_PREFIX}${s}`))
+  const mastered = dig(params['MasteredWaza'], 'value', 'values')
+  const learned = Array.isArray(mastered)
+    ? mastered.filter((v): v is string => typeof v === 'string')
+    : []
+  writeWazaList(params, 'EquipWaza', equip)
+  writeWazaList(params, 'MasteredWaza', [...new Set([...learned, ...equip])])
+}
+
+/** Set the base work speed stat (single-nested IntProperty). */
+export function setCraftSpeed(params: Record<string, unknown>, value: number): void {
+  const node = params['CraftSpeed']
+  if (isVN(node)) node.value = value
+  else params['CraftSpeed'] = { id: null, value, type: 'IntProperty' }
+}
+
 /**
  * Toggle the Alpha (boss) variant: the game keys it off a `BOSS_` prefix on
  * CharacterID (IsRarePal is the separate Lucky flag). Stats are untouched.
@@ -681,6 +736,8 @@ export function applyPalEdit(params: Record<string, unknown>, input: PalEditInpu
   }
   if (input.passives !== undefined) setPassives(params, input.passives)
   if (input.workSuitability !== undefined) setWorkSuitability(params, input.workSuitability)
+  if (input.equippedSkills !== undefined) setEquippedSkills(params, input.equippedSkills)
+  if (input.craftSpeed !== undefined) setCraftSpeed(params, input.craftSpeed)
   if (input.alpha !== undefined) setAlpha(params, input.alpha)
   if (input.heal) healPal(params)
 }

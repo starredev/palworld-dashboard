@@ -7,6 +7,7 @@ import type { PalSummary } from '@tsuki/types'
 import { api } from '@/lib/api'
 import { useQueueOp } from '@/composables/use-save-batch'
 import { PASSIVES, passiveName, passiveDef, KIND_COLOR, KIND_ORDER, KIND_LABEL } from '../passives'
+import { SKILLS, skillName, skillDef } from '../skills'
 import { WORK_TYPES, useSpeciesWork } from '../work'
 
 const props = defineProps<{ pal: PalSummary | null; uid: string | null }>()
@@ -20,6 +21,10 @@ const isAlpha = (species: string | null | undefined) => /^BOSS_/i.test(species ?
 const form = ref({ level: '', stars: 0, hp: '', shot: '', defense: '', heal: false, alpha: false })
 // Statue of Power soul ranks (0–20, +3% per rank).
 const souls = ref({ hp: '0', attack: '0', defense: '0', craftSpeed: '0' })
+// Base work speed stat (CraftSpeed int) and equipped active skills (max 3).
+const workSpeed = ref('')
+const skills = ref<string[]>([])
+const skillPick = ref('')
 // Selected passive ids (prefilled from the pal; unknown ids are preserved).
 const passives = ref<string[]>([])
 const addPick = ref('')
@@ -46,6 +51,9 @@ watch(
       defense: String(p?.soulDefense ?? 0),
       craftSpeed: String(p?.soulCraftSpeed ?? 0),
     }
+    workSpeed.value = p?.craftSpeed != null ? String(p.craftSpeed) : ''
+    skills.value = [...(p?.equippedSkills ?? [])]
+    skillPick.value = ''
     passives.value = [...(p?.passives ?? [])]
     addPick.value = ''
     const bonuses: Record<string, number> = {}
@@ -133,6 +141,35 @@ const soulsChanged = computed<Partial<Record<'soulHp' | 'soulAttack' | 'soulDefe
   for (const [k, next, cur] of pairs) if (next !== cur) out[k] = next
   return out
 })
+
+// Base work speed: only send a valid, actually-changed value.
+const workSpeedChanged = computed(() => {
+  const next = Math.trunc(Number(workSpeed.value))
+  return workSpeed.value !== '' && next >= 1 && next !== (props.pal?.craftSpeed ?? null)
+})
+
+// Equipped active skills (max 3), grouped per element for the picker.
+const skillAddable = computed(() => SKILLS.filter((s) => !skills.value.includes(s.id)))
+const skillGroups = computed(() => {
+  const elements = [...new Set(skillAddable.value.map((s) => s.element))]
+  return elements.map((e) => ({ label: e, items: skillAddable.value.filter((s) => s.element === e) }))
+})
+function addSkill(id: string): void {
+  if (id && skills.value.length < 3 && !skills.value.includes(id)) skills.value.push(id)
+  skillPick.value = ''
+}
+function removeSkill(id: string): void {
+  skills.value = skills.value.filter((s) => s !== id)
+}
+const skillsChanged = computed(() => {
+  const a = [...(props.pal?.equippedSkills ?? [])].sort()
+  const b = [...skills.value].sort()
+  return a.length !== b.length || a.some((x, i) => x !== b[i])
+})
+const skillTitle = (id: string) => {
+  const d = skillDef(id)
+  return d ? `${d.element}${d.power != null ? ` · power ${d.power}` : ''}` : id
+}
 function setStars(n: number): void {
   form.value.stars = form.value.stars === n ? n - 1 : n
 }
@@ -163,6 +200,8 @@ function queueEdit(): void {
         ...(starsChanged.value ? { stars: form.value.stars } : {}),
         ...(alphaChanged.value ? { alpha: form.value.alpha } : {}),
         ...soulsChanged.value,
+        ...(workSpeedChanged.value ? { craftSpeed: Math.trunc(Number(workSpeed.value)) } : {}),
+        ...(skillsChanged.value ? { equippedSkills: skills.value } : {}),
         ...(form.value.heal ? { heal: true } : {}),
         ...(passivesChanged.value ? { passives: passives.value } : {}),
         ...(Object.keys(workChanged.value).length ? { workSuitability: workChanged.value } : {}),
@@ -300,6 +339,56 @@ function queueCopy(): void {
                 max="20"
               />
             </label>
+          </div>
+
+          <!-- Base work speed stat (CraftSpeed int in the save) -->
+          <div class="mt-4">
+            <label class="block text-xs font-medium text-muted-foreground">
+              Base work speed
+              <span v-if="pal.craftSpeed != null" class="text-muted-foreground/60">
+                · current {{ pal.craftSpeed }}</span
+              >
+            </label>
+            <Input v-model="workSpeed" type="number" min="1" class="mt-1.5 w-28" placeholder="100" />
+          </div>
+
+          <!-- Equipped active skills (max 3; equipping also teaches the move) -->
+          <div class="mt-4">
+            <p class="text-xs font-medium text-muted-foreground">
+              Active skills · {{ skills.length }}/3
+            </p>
+            <div v-if="skills.length" class="mt-1.5 flex flex-wrap gap-1.5">
+              <span
+                v-for="id in skills"
+                :key="id"
+                class="inline-flex items-center gap-1.5 rounded-md bg-muted/60 py-1 pl-2 pr-1 text-xs"
+              >
+                <span :title="skillTitle(id)">{{ skillName(id) }}</span>
+                <button
+                  class="text-muted-foreground hover:text-foreground"
+                  aria-label="Remove"
+                  @click="removeSkill(id)"
+                >
+                  <X class="size-3" />
+                </button>
+              </span>
+            </div>
+            <div v-if="skills.length < 3" class="mt-1.5 flex items-center gap-1.5">
+              <select
+                v-model="skillPick"
+                class="h-8 min-w-0 flex-1 rounded-lg border border-border bg-background px-2 text-xs outline-none focus:ring-2 focus:ring-ring"
+              >
+                <option value="">Add an active skill…</option>
+                <optgroup v-for="g in skillGroups" :key="g.label" :label="g.label">
+                  <option v-for="s in g.items" :key="s.id" :value="s.id">
+                    {{ s.name }}{{ s.power != null ? ` — ${s.power}` : '' }}
+                  </option>
+                </optgroup>
+              </select>
+              <Button variant="outline" size="sm" :disabled="!skillPick" @click="addSkill(skillPick)">
+                <Plus />
+              </Button>
+            </div>
           </div>
 
           <!-- Passive skills (speed passives also boost mount/fly speed) -->

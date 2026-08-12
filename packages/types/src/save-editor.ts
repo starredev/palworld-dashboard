@@ -75,6 +75,10 @@ export const palSummarySchema = z.object({
   soulAttack: z.number().nullable(),
   soulDefense: z.number().nullable(),
   soulCraftSpeed: z.number().nullable(),
+  /** Base work speed stat (the save's CraftSpeed int; absent = species default). */
+  craftSpeed: z.number().nullable(),
+  /** Equipped active skills (bare EPalWazaID values, max 3). */
+  equippedSkills: z.array(z.string()),
   lucky: z.boolean(),
   /** Passive skill internal ids (e.g. "MoveSpeed_up_3"). */
   passives: z.array(z.string()),
@@ -111,6 +115,13 @@ export const palEditInputSchema = z
     soulAttack: z.number().int().min(0).max(20).optional(),
     soulDefense: z.number().int().min(0).max(20).optional(),
     soulCraftSpeed: z.number().int().min(0).max(20).optional(),
+    /** Base work speed (CraftSpeed int). */
+    craftSpeed: z.number().int().min(1).max(10000).optional(),
+    /**
+     * Equipped active skills (bare EPalWazaID values, max 3, deduped). The
+     * writer also unions them into MasteredWaza so the game shows them.
+     */
+    equippedSkills: z.array(z.string().min(1)).max(3).optional(),
     heal: z.boolean().optional(),
     /**
      * Alpha (boss) variant. The game keys this off a `BOSS_` prefix on

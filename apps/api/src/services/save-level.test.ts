@@ -269,6 +269,54 @@ describe('applyPalEdit', () => {
     expect((params.Rank_Attack as { type: string }).type).toBe('ByteProperty')
   })
 
+  it('skills: equips max 3 with prefix and unions them into MasteredWaza', () => {
+    const params: Record<string, unknown> = {
+      MasteredWaza: {
+        array_type: 'EnumProperty',
+        id: null,
+        value: { values: ['EPalWazaID::WaterGun'] },
+        type: 'ArrayProperty',
+      },
+    }
+    applyPalEdit(params, { equippedSkills: ['DragonMeteor', 'Apocalypse', 'HyperBeam'] })
+    const equip = params.EquipWaza as { array_type: string; value: { values: string[] } }
+    expect(equip.array_type).toBe('EnumProperty')
+    expect(equip.value.values).toEqual([
+      'EPalWazaID::DragonMeteor',
+      'EPalWazaID::Apocalypse',
+      'EPalWazaID::HyperBeam',
+    ])
+    expect((params.MasteredWaza as { value: { values: string[] } }).value.values).toEqual([
+      'EPalWazaID::WaterGun',
+      'EPalWazaID::DragonMeteor',
+      'EPalWazaID::Apocalypse',
+      'EPalWazaID::HyperBeam',
+    ])
+  })
+
+  it('skills: creates both waza nodes on a pal without any', () => {
+    const params: Record<string, unknown> = {}
+    applyPalEdit(params, { equippedSkills: ['EPalWazaID::AirCanon'] })
+    expect((params.EquipWaza as { value: { values: string[] } }).value.values).toEqual([
+      'EPalWazaID::AirCanon',
+    ])
+    expect((params.MasteredWaza as { value: { values: string[] } }).value.values).toEqual([
+      'EPalWazaID::AirCanon',
+    ])
+  })
+
+  it('craftSpeed: updates in place or creates the IntProperty', () => {
+    const params: Record<string, unknown> = {
+      CraftSpeed: { id: null, value: 100, type: 'IntProperty' },
+    }
+    applyPalEdit(params, { craftSpeed: 500 })
+    expect((params.CraftSpeed as { value: number }).value).toBe(500)
+    const fresh: Record<string, unknown> = {}
+    applyPalEdit(fresh, { craftSpeed: 250 })
+    expect((fresh.CraftSpeed as { value: number; type: string }).value).toBe(250)
+    expect((fresh.CraftSpeed as { type: string }).type).toBe('IntProperty')
+  })
+
   it('alpha: adds the BOSS_ prefix to CharacterID', () => {
     const params: Record<string, unknown> = {
       CharacterID: { value: 'Foxparks', type: 'NameProperty' },
